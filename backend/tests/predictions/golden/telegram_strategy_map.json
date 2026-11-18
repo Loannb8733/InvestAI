@@ -2,7 +2,7 @@
   {
     "alert_type": "WEEKLY_STRATEGY",
     "chat_id": "4242",
-    "message": "📅 <b>Stratégie Hebdo</b>\n\n🟢 1 Achat(s) suggéré(s) : DOGE\n⚪ 4 position(s) à maintenir\n\n💰 Portefeuille : <b>65 440 €</b>",
+    "message": "📅 <b>Lecture technique hebdo</b>\n\n🔴 2 configuration(s) défavorable(s) : UNI, SOL\n⚪ 3 configuration(s) neutre(s)\n\n💰 Portefeuille : <b>65 440 €</b>\n\n<i>Information générale, pas un conseil en investissement.</i>",
     "priority": "normal",
     "symbol": "STRATEGY",
     "user_id": "<id-0>"

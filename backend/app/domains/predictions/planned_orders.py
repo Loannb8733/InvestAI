@@ -1,4 +1,3 @@
-from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -84,18 +83,3 @@ async def apply_status(db: AsyncSession, order: PlannedOrder, new_status: Any) -
         order.status = PlannedOrderStatus(new_status)
         await db.commit()
     return {"id": str(order.id), "status": order.status.value}
-
-
-async def add_telegram_order(db: AsyncSession, user_id: str, symbol: str, order_eur: float, chat_id: str) -> None:
-    """Ajoute l'achat planifié depuis le bouton d'une alerte Telegram, sans le valider."""
-    db.add(
-        PlannedOrder(
-            user_id=UUID(user_id),
-            symbol=symbol,
-            action="ACHAT",
-            order_eur=Decimal(str(order_eur)),
-            source="telegram",
-            status=PlannedOrderStatus.PENDING,
-            notes=f"Planifié via Telegram (chat {chat_id})",
-        )
-    )

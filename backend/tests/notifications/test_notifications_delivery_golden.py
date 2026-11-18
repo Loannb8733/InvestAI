@@ -17,7 +17,6 @@ from app.domains.notifications.report_mailer import report_mailer
 from app.domains.notifications.repository import NotificationRepository
 from app.domains.notifications.service import NotificationService
 from app.domains.notifications.telegram.client import telegram_service
-from app.domains.notifications.telegram.messages import alpha_keyboard
 from tests.conftest import TestSessionLocal
 from tests.notifications.recording import Mailbox, Recorder, Telegram
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
@@ -75,7 +74,6 @@ async def _typed_alerts(rec: Recorder, telegram: Telegram) -> None:
         await telegram_service.alert_bottom_zone("ETH", 2000.0, 1800.0, 0.5, 11.1),
     ]
     rec.check("telegram_bottom_zones", {"results": bottoms, "calls": telegram.drain()})
-    rec.check("telegram_alpha_keyboard", alpha_keyboard("u1", "SOL", 250.5))
 
 
 async def test_telegram_alerts_match_golden(telegram: Telegram, monkeypatch: pytest.MonkeyPatch) -> None:

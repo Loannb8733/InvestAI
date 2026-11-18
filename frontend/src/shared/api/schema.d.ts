@@ -1252,8 +1252,8 @@ export interface paths {
         };
         /**
          * Validate Signal
-         * @description Valide le signal alpha (ou ``symbol``/``action`` imposés) par l'impact Monte-Carlo sur la probabilité de
-         *     ruine, puis envoie le rapport sur Telegram.
+         * @description Simule l'effet d'un achat hypothétique de ``amount_eur`` (montant choisi par l'utilisateur) sur la
+         *     probabilité de ruine et la concentration, puis envoie le rapport sur Telegram. Aucun montant n'est proposé.
          */
         get: operations["validate_signal_api_v1_predictions_validate_signal_get"];
         put?: never;
@@ -1273,8 +1273,8 @@ export interface paths {
         };
         /**
          * Get Strategy Map
-         * @description Matrice de décision croisant scores alpha et phases de cycle ; récapitulatif Telegram s'il y a des achats ou
-         *     des ventes.
+         * @description Lecture croisée scores alpha et phases de cycle, en constats descriptifs ; récapitulatif Telegram s'il y a des
+         *     configurations favorables ou défavorables.
          */
         get: operations["get_strategy_map_api_v1_predictions_strategy_map_get"];
         put?: never;
@@ -2735,13 +2735,56 @@ export interface paths {
         post?: never;
         /**
          * Delete Strategy
-         * @description Supprime la stratégie et ses actions ; une stratégie générée par l'IA est refusée (403).
+         * @description Supprime la stratégie et ses actions ; une stratégie héritée de l'ancienne génération automatique est
+         *     refusée (403) : on la rejette pour l'archiver.
          */
         delete: operations["delete_strategy_api_v1_strategies__strategy_id__delete"];
         options?: never;
         head?: never;
         /** Update Strategy */
         patch: operations["update_strategy_api_v1_strategies__strategy_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/strategies/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Simulate Strategy
+         * @description Aperçu d'un modèle paramétré, sans rien enregistrer : échéancier et montants qui découlent des seuls
+         *     paramètres saisis, et, si ``backtest_start`` est fourni, la règle rejouée sur l'historique de prix.
+         */
+        post: operations["simulate_strategy_api_v1_strategies_simulate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/strategies/from-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Strategy From Template
+         * @description Enregistre la règle paramétrée (source USER, ACTIVE) avec une action PENDING par achat ou vente de son
+         *     échéancier, datée de son échéance.
+         */
+        post: operations["create_strategy_from_template_api_v1_strategies_from_template_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/strategies/ai-suggest": {
@@ -2755,7 +2798,10 @@ export interface paths {
         put?: never;
         /**
          * Ai Suggest Strategies
-         * @description Propositions IA (régime de marché, composition, scores alpha, liquidité), enregistrées en PROPOSED.
+         * @deprecated
+         * @description Retiré : InvestAI ne génère plus de stratégies à partir des signaux, des positions ou de la liquidité.
+         *     Répond une liste vide, sans toucher aux propositions déjà enregistrées ; utiliser ``/simulate`` et
+         *     ``/from-template``.
          */
         post: operations["ai_suggest_strategies_api_v1_strategies_ai_suggest_post"];
         delete?: never;
@@ -3403,6 +3449,88 @@ export interface components {
             /** Invested Amount */
             invested_amount?: number | string | null;
         };
+        /** AssetWeight */
+        AssetWeight: {
+            /** Symbol */
+            symbol: string;
+            /** Weight Pct */
+            weight_pct: number;
+        };
+        /**
+         * BacktestResult
+         * @description Résultat de la règle rejouée sur les clôtures enregistrées. ``benchmark_*`` : référence sans la règle
+         *     (conserver la quantité pour les paliers, ne jamais rééquilibrer pour le rééquilibrage), absente sinon.
+         */
+        BacktestResult: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            /**
+             * Events Planned
+             * @default 0
+             */
+            events_planned: number;
+            /**
+             * Events Simulated
+             * @default 0
+             */
+            events_simulated: number;
+            /**
+             * Missing Prices
+             * @default 0
+             */
+            missing_prices: number;
+            /** Invested Eur */
+            invested_eur?: number | null;
+            /** Withdrawn Eur */
+            withdrawn_eur?: number | null;
+            /** Final Value Eur */
+            final_value_eur?: number | null;
+            /** Pnl Eur */
+            pnl_eur?: number | null;
+            /** Pnl Pct */
+            pnl_pct?: number | null;
+            /** Benchmark Label */
+            benchmark_label?: string | null;
+            /** Benchmark Value Eur */
+            benchmark_value_eur?: number | null;
+            /**
+             * Trades
+             * @default []
+             */
+            trades: components["schemas"]["BacktestTrade"][];
+            /**
+             * Trades Truncated
+             * @default false
+             */
+            trades_truncated: boolean;
+            /** Note */
+            note: string;
+        };
+        /** BacktestTrade */
+        BacktestTrade: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "BUY" | "SELL";
+            /** Symbol */
+            symbol: string;
+            /** Amount */
+            amount: number;
+            /** Price */
+            price: number;
+        };
         /** BalanceGap */
         BalanceGap: {
             /** Asset Id */
@@ -4014,6 +4142,33 @@ export interface components {
             regime?: string | null;
             /** Generated At */
             generated_at: string;
+        };
+        /**
+         * DcaParams
+         * @description Achat périodique : ``amount_per_period`` euros à chaque échéance, répartis selon ``weight_pct``.
+         */
+        DcaParams: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            template: "dca";
+            /** Assets */
+            assets: components["schemas"]["AssetWeight"][];
+            /** Amount Per Period */
+            amount_per_period: number;
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "weekly" | "biweekly" | "monthly" | "quarterly";
+            /** Periods */
+            periods: number;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
         };
         /** DeleteAllResult */
         DeleteAllResult: {
@@ -5293,9 +5448,9 @@ export interface components {
             skill_score: number;
             /**
              * Hit Rate
-             * @default 50
+             * @description Direction juste (%) sur les prévisions passées vérifiées ; None si moins de 10.
              */
-            hit_rate: number;
+            hit_rate?: number | null;
             /**
              * Hit Rate Significant
              * @default false
@@ -5303,17 +5458,17 @@ export interface components {
             hit_rate_significant: boolean;
             /**
              * Hit Rate N Samples
+             * @description Nombre de prévisions passées vérifiées à cet horizon.
              * @default 0
              */
             hit_rate_n_samples: number;
-            /**
-             * Reliability Score
-             * @default 50
-             */
-            reliability_score: number;
+            /** Measured Mape */
+            measured_mape?: number | null;
+            /** Reliability Score */
+            reliability_score?: number | null;
             /**
              * Model Confidence
-             * @default uncertain
+             * @default insufficient_history
              */
             model_confidence: string;
             /**
@@ -5640,6 +5795,31 @@ export interface components {
             /** Monthly Dca Eur */
             monthly_dca_eur?: number | null;
         };
+        /**
+         * ProfitTakingParams
+         * @description Prise de profits par paliers sur ``quantity`` unités choisies par l'utilisateur : à chaque seuil de prix
+         *     (EUR) qu'il fixe, vendre ``sell_pct`` % de cette quantité.
+         */
+        ProfitTakingParams: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            template: "profit_taking";
+            /** Symbol */
+            symbol: string;
+            /** Quantity */
+            quantity: number;
+            /** Tiers */
+            tiers: components["schemas"]["ProfitTier"][];
+        };
+        /** ProfitTier */
+        ProfitTier: {
+            /** Price */
+            price: number;
+            /** Sell Pct */
+            sell_pct: number;
+        };
         /** ProjectAuditResponse */
         ProjectAuditResponse: {
             /**
@@ -5859,6 +6039,52 @@ export interface components {
             real_final_value: number;
             /** Currency */
             currency: string;
+        };
+        /** RebalanceLine */
+        RebalanceLine: {
+            /** Symbol */
+            symbol: string;
+            /** Target Pct */
+            target_pct: number;
+            /** Current Value */
+            current_value: number;
+        };
+        /**
+         * RebalanceParams
+         * @description Rééquilibrage vers l'allocation cible choisie, à partir des valeurs actuelles **saisies** par l'utilisateur
+         *     (jamais lues dans ses positions) ; on n'agit que si un écart dépasse ``threshold_pct`` points ou qu'un apport
+         *     ``contribution`` est à répartir. ``frequency`` et ``periods`` fixent le calendrier des revues.
+         */
+        RebalanceParams: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            template: "rebalance";
+            /** Lines */
+            lines: components["schemas"]["RebalanceLine"][];
+            /**
+             * Contribution
+             * @default 0
+             */
+            contribution: number;
+            /**
+             * Threshold Pct
+             * @default 0
+             */
+            threshold_pct: number;
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "weekly" | "biweekly" | "monthly" | "quarterly";
+            /** Periods */
+            periods: number;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
         };
         /** RebalanceResponse */
         RebalanceResponse: {
@@ -6127,6 +6353,32 @@ export interface components {
             alpha?: number | null;
         };
         /**
+         * ScheduleLine
+         * @description Une échéance ; ``amount`` (EUR) vaut ``None`` quand il ne se calcule qu'à l'échéance (VCA) ou pour une
+         *     revue de rééquilibrage, ``date`` vaut ``None`` pour un palier déclenché par le prix.
+         */
+        ScheduleLine: {
+            /** Date */
+            date?: string | null;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "BUY" | "SELL" | "REVIEW";
+            /** Symbol */
+            symbol?: string | null;
+            /** Amount */
+            amount?: number | null;
+            /** Quantity */
+            quantity?: number | null;
+            /** Trigger Price */
+            trigger_price?: number | null;
+            /** Target Value */
+            target_value?: number | null;
+            /** Note */
+            note: string;
+        };
+        /**
          * ScheduledTaskStatus
          * @description Rythme, dernière exécution et dernière issue d'une tâche planifiée.
          */
@@ -6245,32 +6497,15 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        /** SimulationResponse */
-        SimulationResponse: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Name */
-            name: string;
-            /** Description */
-            description: string | null;
-            /** Simulation Type */
-            simulation_type: string;
-            /** Parameters */
-            parameters: {
-                [key: string]: unknown;
-            };
-            /** Results */
-            results: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
+        /**
+         * SimulationRequest
+         * @description ``backtest_start`` : date à partir de laquelle rejouer la règle sur l'historique de prix (optionnelle).
+         */
+        SimulationRequest: {
+            /** Params */
+            params: components["schemas"]["DcaParams"] | components["schemas"]["VcaParams"] | components["schemas"]["ProfitTakingParams"] | components["schemas"]["RebalanceParams"];
+            /** Backtest Start */
+            backtest_start?: string | null;
         };
         /**
          * SimulationType
@@ -6417,7 +6652,7 @@ export interface components {
         };
         /**
          * StrategyActionUpdate
-         * @description Statut ``EXECUTED`` ou ``SKIPPED`` ; ``amount`` remplace le montant proposé par l'IA.
+         * @description Statut ``EXECUTED`` ou ``SKIPPED`` ; ``amount`` remplace le montant prévu (ou le renseigne s'il manquait).
          */
         StrategyActionUpdate: {
             status?: components["schemas"]["ActionStatus"] | null;
@@ -6437,7 +6672,11 @@ export interface components {
             /** Actions */
             actions?: components["schemas"]["StrategyActionCreate"][];
         };
-        /** StrategyResponse */
+        /**
+         * StrategyResponse
+         * @description ``rule_summary`` décrit la règle d'un modèle paramétré ; ``ai_reasoning``, ``market_regime`` et
+         *     ``confidence`` ne sont renseignés que sur les stratégies héritées de l'ancienne génération automatique.
+         */
         StrategyResponse: {
             /**
              * Id
@@ -6461,6 +6700,8 @@ export interface components {
             params: {
                 [key: string]: unknown;
             };
+            /** Rule Summary */
+            rule_summary?: string | null;
             /** Ai Reasoning */
             ai_reasoning?: string | null;
             /** Market Regime */
@@ -6485,7 +6726,8 @@ export interface components {
         };
         /**
          * StrategyStatus
-         * @description ``PROPOSED`` : suggérée par l'IA, pas encore acceptée.
+         * @description ``PROPOSED`` : héritage de l'ancienne génération automatique, suggestion jamais acceptée ni rejetée.
+         *     Plus aucune stratégie n'est créée dans ce statut.
          * @enum {string}
          */
         StrategyStatus: "PROPOSED" | "ACTIVE" | "PAUSED" | "COMPLETED" | "REJECTED";
@@ -6622,6 +6864,15 @@ export interface components {
             withholding_gap: boolean;
             /** Nb Payments */
             nb_payments: number;
+        };
+        /** TemplateStrategyCreate */
+        TemplateStrategyCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Params */
+            params: components["schemas"]["DcaParams"] | components["schemas"]["VcaParams"] | components["schemas"]["ProfitTakingParams"] | components["schemas"]["RebalanceParams"];
         };
         /** TokenResponse */
         TokenResponse: {
@@ -6918,6 +7169,41 @@ export interface components {
             /** Confidence Level */
             confidence_level: number;
         };
+        /**
+         * VcaParams
+         * @description Value averaging : la valeur visée de la ligne augmente de ``target_increment`` euros à chaque échéance ;
+         *     on investit l'écart entre cette cible et la valeur de la ligne ce jour-là, plafonné à ``max_per_period``.
+         */
+        VcaParams: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            template: "vca";
+            /** Symbol */
+            symbol: string;
+            /** Target Increment */
+            target_increment: number;
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "weekly" | "biweekly" | "monthly" | "quarterly";
+            /** Periods */
+            periods: number;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Max Per Period */
+            max_per_period?: number | null;
+            /**
+             * Allow Sell
+             * @default false
+             */
+            allow_sell: boolean;
+        };
         /** WhatIfRequest */
         WhatIfRequest: {
             /** Scenarios */
@@ -6941,6 +7227,51 @@ export interface components {
             currency: string;
             /** Description */
             description: string;
+        };
+        /** SimulationResponse */
+        app__domains__planning__simulations__schemas__SimulationResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Simulation Type */
+            simulation_type: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /** Results */
+            results: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SimulationResponse */
+        app__domains__strategies__schemas__SimulationResponse: {
+            /** Template */
+            template: string;
+            /** Rule Summary */
+            rule_summary: string;
+            /** Schedule */
+            schedule: components["schemas"]["ScheduleLine"][];
+            /** Total Buy Eur */
+            total_buy_eur: number;
+            /** Total Sell Eur */
+            total_sell_eur: number;
+            /** Has Amounts At Execution */
+            has_amounts_at_execution: boolean;
+            backtest?: components["schemas"]["BacktestResult"] | null;
+            /** Disclaimer */
+            disclaimer: string;
         };
     };
     responses: never;
@@ -9506,7 +9837,7 @@ export interface operations {
         parameters: {
             query?: {
                 symbol?: string | null;
-                action?: string | null;
+                amount_eur?: number;
             };
             header?: never;
             path?: never;
@@ -11038,7 +11369,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SimulationResponse"][];
+                    "application/json": components["schemas"]["app__domains__planning__simulations__schemas__SimulationResponse"][];
                 };
             };
             /** @description Validation Error */
@@ -11071,7 +11402,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SimulationResponse"];
+                    "application/json": components["schemas"]["app__domains__planning__simulations__schemas__SimulationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -11102,7 +11433,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SimulationResponse"];
+                    "application/json": components["schemas"]["app__domains__planning__simulations__schemas__SimulationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -12280,6 +12611,72 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    simulate_strategy_api_v1_strategies_simulate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__domains__strategies__schemas__SimulationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_strategy_from_template_api_v1_strategies_from_template_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateStrategyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

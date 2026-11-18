@@ -552,9 +552,11 @@ export default function PredictionCyclesTab({ marketCycle, loadingCycle }: Predi
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
               <Target className="h-4 w-4 text-primary" />
-              Conseils adaptés au cycle
+              Repères sur le cycle
             </CardTitle>
-            <CardDescription>Recommandations basées sur la phase de marché actuelle</CardDescription>
+            <CardDescription>
+              Ce que la phase de marché actuelle signifie et ce qu'a montré l'historique — information générale, pas un conseil en investissement
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">

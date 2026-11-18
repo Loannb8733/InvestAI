@@ -4236,7 +4236,7 @@
           "Predictions"
         ],
         "summary": "Validate Signal",
-        "description": "Valide le signal alpha (ou ``symbol``/``action`` imposés) par l'impact Monte-Carlo sur la probabilité de\nruine, puis envoie le rapport sur Telegram.",
+        "description": "Simule l'effet d'un achat hypothétique de ``amount_eur`` (montant choisi par l'utilisateur) sur la\nprobabilité de ruine et la concentration, puis envoie le rapport sur Telegram. Aucun montant n'est proposé.",
         "operationId": "validate_signal_api_v1_predictions_validate_signal_get",
         "security": [
           {
@@ -4261,19 +4261,15 @@
             }
           },
           {
-            "name": "action",
+            "name": "amount_eur",
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Action"
+              "type": "number",
+              "maximum": 10000000,
+              "minimum": 0,
+              "default": 0.0,
+              "title": "Amount Eur"
             }
           }
         ],
@@ -4309,7 +4305,7 @@
           "Predictions"
         ],
         "summary": "Get Strategy Map",
-        "description": "Matrice de décision croisant scores alpha et phases de cycle ; récapitulatif Telegram s'il y a des achats ou\ndes ventes.",
+        "description": "Lecture croisée scores alpha et phases de cycle, en constats descriptifs ; récapitulatif Telegram s'il y a des\nconfigurations favorables ou défavorables.",
         "operationId": "get_strategy_map_api_v1_predictions_strategy_map_get",
         "responses": {
           "200": {
@@ -6696,7 +6692,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/SimulationResponse"
+                    "$ref": "#/components/schemas/app__domains__planning__simulations__schemas__SimulationResponse"
                   },
                   "title": "Response List Simulations Api V1 Simulations Get"
                 }
@@ -6742,7 +6738,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SimulationResponse"
+                  "$ref": "#/components/schemas/app__domains__planning__simulations__schemas__SimulationResponse"
                 }
               }
             }
@@ -6790,7 +6786,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SimulationResponse"
+                  "$ref": "#/components/schemas/app__domains__planning__simulations__schemas__SimulationResponse"
                 }
               }
             }
@@ -8683,7 +8679,7 @@
           "Strategies"
         ],
         "summary": "Delete Strategy",
-        "description": "Supprime la stratégie et ses actions ; une stratégie générée par l'IA est refusée (403).",
+        "description": "Supprime la stratégie et ses actions ; une stratégie héritée de l'ancienne génération automatique est\nrefusée (403) : on la rejette pour l'archiver.",
         "operationId": "delete_strategy_api_v1_strategies__strategy_id__delete",
         "security": [
           {
@@ -8719,13 +8715,107 @@
         }
       }
     },
+    "/api/v1/strategies/simulate": {
+      "post": {
+        "tags": [
+          "Strategies"
+        ],
+        "summary": "Simulate Strategy",
+        "description": "Aperçu d'un modèle paramétré, sans rien enregistrer : échéancier et montants qui découlent des seuls\nparamètres saisis, et, si ``backtest_start`` est fourni, la règle rejouée sur l'historique de prix.",
+        "operationId": "simulate_strategy_api_v1_strategies_simulate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__domains__strategies__schemas__SimulationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/strategies/from-template": {
+      "post": {
+        "tags": [
+          "Strategies"
+        ],
+        "summary": "Create Strategy From Template",
+        "description": "Enregistre la règle paramétrée (source USER, ACTIVE) avec une action PENDING par achat ou vente de son\néchéancier, datée de son échéance.",
+        "operationId": "create_strategy_from_template_api_v1_strategies_from_template_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateStrategyCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/strategies/ai-suggest": {
       "post": {
         "tags": [
           "Strategies"
         ],
         "summary": "Ai Suggest Strategies",
-        "description": "Propositions IA (régime de marché, composition, scores alpha, liquidité), enregistrées en PROPOSED.",
+        "description": "Retiré : InvestAI ne génère plus de stratégies à partir des signaux, des positions ou de la liquidité.\nRépond une liste vide, sans toucher aux propositions déjà enregistrées ; utiliser ``/simulate`` et\n``/from-template``.",
         "operationId": "ai_suggest_strategies_api_v1_strategies_ai_suggest_post",
         "responses": {
           "200": {
@@ -8743,6 +8833,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -10445,6 +10536,227 @@
         "type": "object",
         "title": "AssetUpdate"
       },
+      "AssetWeight": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9.^\\-]+$",
+            "title": "Symbol"
+          },
+          "weight_pct": {
+            "type": "number",
+            "maximum": 100.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Weight Pct"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "symbol",
+          "weight_pct"
+        ],
+        "title": "AssetWeight"
+      },
+      "BacktestResult": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "events_planned": {
+            "type": "integer",
+            "title": "Events Planned",
+            "default": 0
+          },
+          "events_simulated": {
+            "type": "integer",
+            "title": "Events Simulated",
+            "default": 0
+          },
+          "missing_prices": {
+            "type": "integer",
+            "title": "Missing Prices",
+            "default": 0
+          },
+          "invested_eur": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invested Eur"
+          },
+          "withdrawn_eur": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn Eur"
+          },
+          "final_value_eur": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Value Eur"
+          },
+          "pnl_eur": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl Eur"
+          },
+          "pnl_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl Pct"
+          },
+          "benchmark_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Label"
+          },
+          "benchmark_value_eur": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Value Eur"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestTrade"
+            },
+            "type": "array",
+            "title": "Trades",
+            "default": []
+          },
+          "trades_truncated": {
+            "type": "boolean",
+            "title": "Trades Truncated",
+            "default": false
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "note"
+        ],
+        "title": "BacktestResult",
+        "description": "Résultat de la règle rejouée sur les clôtures enregistrées. ``benchmark_*`` : référence sans la règle\n(conserver la quantité pour les paliers, ne jamais rééquilibrer pour le rééquilibrage), absente sinon."
+      },
+      "BacktestTrade": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "BUY",
+              "SELL"
+            ],
+            "title": "Action"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "action",
+          "symbol",
+          "amount",
+          "price"
+        ],
+        "title": "BacktestTrade"
+      },
       "BalanceGap": {
         "properties": {
           "asset_id": {
@@ -12075,6 +12387,63 @@
         ],
         "title": "DashboardSummaryResponse",
         "description": "Résumé du widget du tableau de bord."
+      },
+      "DcaParams": {
+        "properties": {
+          "template": {
+            "type": "string",
+            "const": "dca",
+            "title": "Template"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetWeight"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Assets"
+          },
+          "amount_per_period": {
+            "type": "number",
+            "maximum": 1000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Amount Per Period"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "weekly",
+              "biweekly",
+              "monthly",
+              "quarterly"
+            ],
+            "title": "Frequency"
+          },
+          "periods": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Periods"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "template",
+          "assets",
+          "amount_per_period",
+          "frequency",
+          "periods",
+          "start_date"
+        ],
+        "title": "DcaParams",
+        "description": "Achat périodique : ``amount_per_period`` euros à chaque échéance, répartis selon ``weight_pct``."
       },
       "DeleteAllResult": {
         "properties": {
@@ -15503,9 +15872,16 @@
             "default": 50.0
           },
           "hit_rate": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Hit Rate",
-            "default": 50.0
+            "description": "Direction juste (%) sur les prévisions passées vérifiées ; None si moins de 10."
           },
           "hit_rate_significant": {
             "type": "boolean",
@@ -15515,17 +15891,35 @@
           "hit_rate_n_samples": {
             "type": "integer",
             "title": "Hit Rate N Samples",
+            "description": "Nombre de prévisions passées vérifiées à cet horizon.",
             "default": 0
           },
+          "measured_mape": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured Mape"
+          },
           "reliability_score": {
-            "type": "number",
-            "title": "Reliability Score",
-            "default": 50.0
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reliability Score"
           },
           "model_confidence": {
             "type": "string",
             "title": "Model Confidence",
-            "default": "uncertain"
+            "default": "insufficient_history"
           },
           "models_agree": {
             "type": "boolean",
@@ -16511,6 +16905,70 @@
         "title": "ProfileUpdate",
         "description": "Champs modifiables par l'utilisateur lui-même ; ``null`` efface une valeur du profil investisseur."
       },
+      "ProfitTakingParams": {
+        "properties": {
+          "template": {
+            "type": "string",
+            "const": "profit_taking",
+            "title": "Template"
+          },
+          "symbol": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9.^\\-]+$",
+            "title": "Symbol"
+          },
+          "quantity": {
+            "type": "number",
+            "maximum": 1000000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity"
+          },
+          "tiers": {
+            "items": {
+              "$ref": "#/components/schemas/ProfitTier"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Tiers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "template",
+          "symbol",
+          "quantity",
+          "tiers"
+        ],
+        "title": "ProfitTakingParams",
+        "description": "Prise de profits par paliers sur ``quantity`` unités choisies par l'utilisateur : à chaque seuil de prix\n(EUR) qu'il fixe, vendre ``sell_pct`` % de cette quantité."
+      },
+      "ProfitTier": {
+        "properties": {
+          "price": {
+            "type": "number",
+            "maximum": 1000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Price"
+          },
+          "sell_pct": {
+            "type": "number",
+            "maximum": 100.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Sell Pct"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "price",
+          "sell_pct"
+        ],
+        "title": "ProfitTier"
+      },
       "ProjectAuditResponse": {
         "properties": {
           "id": {
@@ -17111,6 +17569,101 @@
         ],
         "title": "ProjectionResult",
         "description": "``real_final_value`` : valeur finale corrigée de l'inflation."
+      },
+      "RebalanceLine": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9.^\\-]+$",
+            "title": "Symbol"
+          },
+          "target_pct": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Target Pct"
+          },
+          "current_value": {
+            "type": "number",
+            "maximum": 1000000000000.0,
+            "minimum": 0.0,
+            "title": "Current Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "symbol",
+          "target_pct",
+          "current_value"
+        ],
+        "title": "RebalanceLine"
+      },
+      "RebalanceParams": {
+        "properties": {
+          "template": {
+            "type": "string",
+            "const": "rebalance",
+            "title": "Template"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/RebalanceLine"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 2,
+            "title": "Lines"
+          },
+          "contribution": {
+            "type": "number",
+            "maximum": 1000000000.0,
+            "minimum": 0.0,
+            "title": "Contribution",
+            "default": 0.0
+          },
+          "threshold_pct": {
+            "type": "number",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Threshold Pct",
+            "default": 0.0
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "weekly",
+              "biweekly",
+              "monthly",
+              "quarterly"
+            ],
+            "title": "Frequency"
+          },
+          "periods": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Periods"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "template",
+          "lines",
+          "frequency",
+          "periods",
+          "start_date"
+        ],
+        "title": "RebalanceParams",
+        "description": "Rééquilibrage vers l'allocation cible choisie, à partir des valeurs actuelles **saisies** par l'utilisateur\n(jamais lues dans ses positions) ; on n'agit que si un écart dépasse ``threshold_pct`` points ou qu'un apport\n``contribution`` est à répartir. ``frequency`` et ``periods`` fixent le calendrier des revues."
       },
       "RebalanceResponse": {
         "properties": {
@@ -17794,6 +18347,97 @@
         "title": "RiskMetrics",
         "description": "Indicateurs de risque."
       },
+      "ScheduleLine": {
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "BUY",
+              "SELL",
+              "REVIEW"
+            ],
+            "title": "Action"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "trigger_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Price"
+          },
+          "target_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Value"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "note"
+        ],
+        "title": "ScheduleLine",
+        "description": "Une échéance ; ``amount`` (EUR) vaut ``None`` quand il ne se calcule qu'à l'échéance (VCA) ou pour une\nrevue de rééquilibrage, ``date`` vaut ``None`` pour un palier déclenché par le prix."
+      },
       "ScheduledTaskStatus": {
         "properties": {
           "name": {
@@ -18162,66 +18806,53 @@
         ],
         "title": "SimulationCreate"
       },
-      "SimulationResponse": {
+      "SimulationRequest": {
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
+          "params": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DcaParams"
+              },
+              {
+                "$ref": "#/components/schemas/VcaParams"
+              },
+              {
+                "$ref": "#/components/schemas/ProfitTakingParams"
+              },
+              {
+                "$ref": "#/components/schemas/RebalanceParams"
+              }
+            ],
+            "title": "Params",
+            "discriminator": {
+              "propertyName": "template",
+              "mapping": {
+                "dca": "#/components/schemas/DcaParams",
+                "profit_taking": "#/components/schemas/ProfitTakingParams",
+                "rebalance": "#/components/schemas/RebalanceParams",
+                "vca": "#/components/schemas/VcaParams"
+              }
+            }
           },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "description": {
+          "backtest_start": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Description"
-          },
-          "simulation_type": {
-            "type": "string",
-            "title": "Simulation Type"
-          },
-          "parameters": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Parameters"
-          },
-          "results": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Results"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
+            "title": "Backtest Start"
           }
         },
         "type": "object",
         "required": [
-          "id",
-          "name",
-          "description",
-          "simulation_type",
-          "parameters",
-          "results",
-          "created_at"
+          "params"
         ],
-        "title": "SimulationResponse"
+        "title": "SimulationRequest",
+        "description": "``backtest_start`` : date à partir de laquelle rejouer la règle sur l'historique de prix (optionnelle)."
       },
       "SimulationType": {
         "type": "string",
@@ -18642,7 +19273,7 @@
         },
         "type": "object",
         "title": "StrategyActionUpdate",
-        "description": "Statut ``EXECUTED`` ou ``SKIPPED`` ; ``amount`` remplace le montant proposé par l'IA."
+        "description": "Statut ``EXECUTED`` ou ``SKIPPED`` ; ``amount`` remplace le montant prévu (ou le renseigne s'il manquait)."
       },
       "StrategyCreate": {
         "properties": {
@@ -18722,6 +19353,17 @@
             "type": "object",
             "title": "Params"
           },
+          "rule_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Summary"
+          },
           "ai_reasoning": {
             "anyOf": [
               {
@@ -18785,7 +19427,8 @@
           "created_at",
           "updated_at"
         ],
-        "title": "StrategyResponse"
+        "title": "StrategyResponse",
+        "description": "``rule_summary`` décrit la règle d'un modèle paramétré ; ``ai_reasoning``, ``market_regime`` et\n``confidence`` ne sont renseignés que sur les stratégies héritées de l'ancienne génération automatique."
       },
       "StrategyStatus": {
         "type": "string",
@@ -18797,7 +19440,7 @@
           "REJECTED"
         ],
         "title": "StrategyStatus",
-        "description": "``PROPOSED`` : suggérée par l'IA, pas encore acceptée."
+        "description": "``PROPOSED`` : héritage de l'ancienne génération automatique, suggestion jamais acceptée ni rejetée.\nPlus aucune stratégie n'est créée dans ce statut."
       },
       "StrategyUpdate": {
         "properties": {
@@ -19156,6 +19799,60 @@
         ],
         "title": "TaxReportPlatform",
         "description": "Intérêts annuels d'une plateforme ; withholding_gap : retenue à plus de 1 € du PFU théorique."
+      },
+      "TemplateStrategyCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "params": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DcaParams"
+              },
+              {
+                "$ref": "#/components/schemas/VcaParams"
+              },
+              {
+                "$ref": "#/components/schemas/ProfitTakingParams"
+              },
+              {
+                "$ref": "#/components/schemas/RebalanceParams"
+              }
+            ],
+            "title": "Params",
+            "discriminator": {
+              "propertyName": "template",
+              "mapping": {
+                "dca": "#/components/schemas/DcaParams",
+                "profit_taking": "#/components/schemas/ProfitTakingParams",
+                "rebalance": "#/components/schemas/RebalanceParams",
+                "vca": "#/components/schemas/VcaParams"
+              }
+            }
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "params"
+        ],
+        "title": "TemplateStrategyCreate"
       },
       "TokenResponse": {
         "properties": {
@@ -20031,6 +20728,79 @@
         "title": "ValueAtRisk",
         "description": "Perte potentielle à un niveau de confiance."
       },
+      "VcaParams": {
+        "properties": {
+          "template": {
+            "type": "string",
+            "const": "vca",
+            "title": "Template"
+          },
+          "symbol": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9.^\\-]+$",
+            "title": "Symbol"
+          },
+          "target_increment": {
+            "type": "number",
+            "maximum": 1000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Target Increment"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "weekly",
+              "biweekly",
+              "monthly",
+              "quarterly"
+            ],
+            "title": "Frequency"
+          },
+          "periods": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Periods"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "max_per_period": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000000000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Per Period"
+          },
+          "allow_sell": {
+            "type": "boolean",
+            "title": "Allow Sell",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "template",
+          "symbol",
+          "target_increment",
+          "frequency",
+          "periods",
+          "start_date"
+        ],
+        "title": "VcaParams",
+        "description": "Value averaging : la valeur visée de la ligne augmente de ``target_increment`` euros à chaque échéance ;\non investit l'écart entre cette cible et la valeur de la ligne ce jour-là, plafonné à ``max_per_period``."
+      },
       "WhatIfRequest": {
         "properties": {
           "scenarios": {
@@ -20096,6 +20866,123 @@
           "description"
         ],
         "title": "XIRRResponse"
+      },
+      "app__domains__planning__simulations__schemas__SimulationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "simulation_type": {
+            "type": "string",
+            "title": "Simulation Type"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameters"
+          },
+          "results": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Results"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "simulation_type",
+          "parameters",
+          "results",
+          "created_at"
+        ],
+        "title": "SimulationResponse"
+      },
+      "app__domains__strategies__schemas__SimulationResponse": {
+        "properties": {
+          "template": {
+            "type": "string",
+            "title": "Template"
+          },
+          "rule_summary": {
+            "type": "string",
+            "title": "Rule Summary"
+          },
+          "schedule": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleLine"
+            },
+            "type": "array",
+            "title": "Schedule"
+          },
+          "total_buy_eur": {
+            "type": "number",
+            "title": "Total Buy Eur"
+          },
+          "total_sell_eur": {
+            "type": "number",
+            "title": "Total Sell Eur"
+          },
+          "has_amounts_at_execution": {
+            "type": "boolean",
+            "title": "Has Amounts At Execution"
+          },
+          "backtest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "template",
+          "rule_summary",
+          "schedule",
+          "total_buy_eur",
+          "total_sell_eur",
+          "has_amounts_at_execution",
+          "disclaimer"
+        ],
+        "title": "SimulationResponse"
       }
     },
     "securitySchemes": {

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
+from tests.strategies.legacy import seed_legacy_ai_strategies
 
 pytestmark = pytest.mark.usefixtures("empty_test_redis", "offline", "live_quotes", "deterministic_forecaster")
 BASE = "/api/v1/strategies"
@@ -37,31 +38,31 @@ async def test_an_unknown_action_status_is_rejected_as_invalid(client: AsyncClie
     assert response.status_code == 422
 
 
-async def test_suggesting_again_replaces_the_pending_proposals(
+async def test_suggest_no_longer_generates_anything_and_keeps_legacy_proposals(
     client: AsyncClient, db_session: AsyncSession, regular_user: User
 ) -> None:
     with time_machine.travel(FROZEN_NOW, tick=False):
         headers = await _seeded(client, db_session, regular_user)
-        first = (await client.post(f"{BASE}/ai-suggest", headers=headers)).json()
-        await client.patch(f"{BASE}/{first[0]['id']}/accept", headers=headers)
-        second = (await client.post(f"{BASE}/ai-suggest", headers=headers)).json()
+        proposed, _ = await seed_legacy_ai_strategies(db_session, regular_user)
+        suggested = await client.post(f"{BASE}/ai-suggest", headers=headers)
         listed = (await client.get(BASE, headers=headers)).json()
-    proposed = [s["id"] for s in listed if s["status"] == "PROPOSED"]
-    assert sorted(proposed) == sorted(s["id"] for s in second)
-    assert any(s["id"] == first[0]["id"] and s["status"] == "ACTIVE" for s in listed)
+    assert suggested.status_code == 200
+    assert suggested.json() == []
+    assert [s["status"] for s in listed if s["id"] == str(proposed.id)] == ["PROPOSED"]
+    assert len(listed) == 2
 
 
-async def test_strategy_names_count_assets_in_french(
+async def test_legacy_ai_strategies_still_display_and_measure(
     client: AsyncClient, db_session: AsyncSession, regular_user: User
 ) -> None:
     with time_machine.travel(FROZEN_NOW, tick=False):
         headers = await _seeded(client, db_session, regular_user)
-        names = [s["name"] for s in (await client.post(f"{BASE}/ai-suggest", headers=headers)).json()]
-    assert not [n for n in names if "assets" in n]
-    assert any(n.endswith("1 actif") for n in names)
-
-
-async def test_an_empty_portfolio_gets_no_suggestion(client: AsyncClient, regular_user: User) -> None:
-    response = await client.post(f"{BASE}/ai-suggest", headers=_headers(regular_user))
-    assert response.status_code == 200
-    assert response.json() == []
+        _, accepted = await seed_legacy_ai_strategies(db_session, regular_user)
+        listed = (await client.get(BASE, headers=headers)).json()
+        performance = (await client.get(f"{BASE}/{accepted.id}/performance", headers=headers)).json()
+    assert all(s["rule_summary"] is None and s["source"] == "AI" for s in listed)
+    assert {line["action"]: line["direction"] for line in performance["lines"]} == {
+        "ACHAT FORT": "buy",
+        "ALLÉGER": "sell",
+    }
+    assert performance["non_evaluable_count"] == 0

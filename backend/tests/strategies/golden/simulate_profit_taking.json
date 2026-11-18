@@ -1,0 +1,60 @@
+{
+  "body": {
+    "backtest": {
+      "available": true,
+      "benchmark_label": "Conserver toute la quantité",
+      "benchmark_value_eur": 11497.52,
+      "end_date": "2026-10-17",
+      "events_planned": 2,
+      "events_simulated": 1,
+      "final_value_eur": 8623.14,
+      "invested_eur": 9039.14,
+      "missing_prices": 0,
+      "note": "Simulation passée : ce que la règle aurait donné sur l'historique de prix enregistré, aux clôtures journalières, sans frais ni fiscalité. Elle n'a aucune valeur prédictive.",
+      "pnl_eur": 2586.4,
+      "pnl_pct": 28.61,
+      "reason": null,
+      "start_date": "2025-10-01",
+      "trades": [
+        {
+          "action": "SELL",
+          "amount": 3002.39,
+          "date": "2026-07-14",
+          "price": 60047.8992,
+          "symbol": "BTC"
+        }
+      ],
+      "trades_truncated": false,
+      "withdrawn_eur": 3002.39
+    },
+    "disclaimer": "Simulation calculée uniquement à partir des paramètres que vous avez saisis. Ce n'est pas un conseil en investissement ni une recommandation personnalisée : InvestAI ne choisit ni les actifs, ni les montants, ni le moment d'agir. Les performances passées ne préjugent pas des performances futures.",
+    "has_amounts_at_execution": false,
+    "rule_summary": "Prise de profits par paliers sur 0,2 BTC : 25 % à 60 000,00 €, 50 % à 90 000,00 € (75 % de la quantité au total).",
+    "schedule": [
+      {
+        "action": "SELL",
+        "amount": 3000.0,
+        "date": null,
+        "note": "Palier 1 : si le cours atteint 60 000,00 €, vendre 25 % de la quantité indiquée, soit 0,05 BTC (≈ 3 000,00 €)",
+        "quantity": 0.05,
+        "symbol": "BTC",
+        "target_value": null,
+        "trigger_price": 60000.0
+      },
+      {
+        "action": "SELL",
+        "amount": 9000.0,
+        "date": null,
+        "note": "Palier 2 : si le cours atteint 90 000,00 €, vendre 50 % de la quantité indiquée, soit 0,1 BTC (≈ 9 000,00 €)",
+        "quantity": 0.1,
+        "symbol": "BTC",
+        "target_value": null,
+        "trigger_price": 90000.0
+      }
+    ],
+    "template": "profit_taking",
+    "total_buy_eur": 0.0,
+    "total_sell_eur": 12000.0
+  },
+  "status": 200
+}

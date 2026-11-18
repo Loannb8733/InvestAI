@@ -48,7 +48,7 @@ def _queue_cycle_alerts(tasks: BackgroundTasks, chat_id: str, user_id: str, resu
     critical_advice = [
         a
         for a in result.get("cycle_advice", [])
-        if a.get("priority") in ("critical", "high") and a.get("action") in ("DCA", "DIVERSIFIER")
+        if a.get("priority") in ("critical", "high") and a.get("action") in ("CONCENTRATION", "CONTEXTE")
     ]
     if critical_advice:
         tasks.add_task(
@@ -71,18 +71,8 @@ def _queue_cycle_alerts(tasks: BackgroundTasks, chat_id: str, user_id: str, resu
         )
 
 
-async def _queue_alpha_alert(
-    tasks: BackgroundTasks, db: AsyncSession, chat_id: str, user_id: str, result: dict[str, Any]
-) -> None:
+def _queue_alpha_alert(tasks: BackgroundTasks, chat_id: str, user_id: str, result: dict[str, Any]) -> None:
     top = result["top_alpha"]
-    total_value = result.get("total_portfolio_value", 0)
-    strategy_data = await prediction_service.get_strategy_map(db, user_id)
-    order_eur = 0.0
-    for row in strategy_data.get("rows", []):
-        if row["symbol"] == top["symbol"]:
-            order_eur = round(total_value * abs(row.get("impact_pct", 0)) / 100, 2)
-            break
-
     tasks.add_task(
         send_alpha_alert,
         chat_id=chat_id,
@@ -91,7 +81,6 @@ async def _queue_alpha_alert(
         score=top["score"],
         predicted_pct=top.get("predicted_7d_pct", 0),
         reasons=top.get("reasons", []),
-        order_eur=order_eur,
     )
 
 
@@ -163,7 +152,7 @@ async def get_top_alpha(background_tasks: BackgroundTasks, user: CurrentUser, se
     result = await prediction_service.get_top_alpha_asset(session, str(user.id))
     chat_id = _telegram_chat(user)
     if chat_id and _is_alpha_alert(result):
-        await _queue_alpha_alert(background_tasks, session, chat_id, str(user.id), result)
+        _queue_alpha_alert(background_tasks, chat_id, str(user.id), result)
 
     if chat_id:
         for scored in result.get("all_scores", []):
@@ -184,15 +173,15 @@ async def validate_signal(
     user: CurrentUser,
     session: Session,
     symbol: Annotated[str | None, Query()] = None,
-    action: Annotated[str | None, Query()] = None,
+    amount_eur: Annotated[float, Query(ge=0, le=10_000_000)] = 0.0,
 ) -> dict[str, Any]:
-    """Valide le signal alpha (ou ``symbol``/``action`` imposés) par l'impact Monte-Carlo sur la probabilité de
-    ruine, puis envoie le rapport sur Telegram."""
+    """Simule l'effet d'un achat hypothétique de ``amount_eur`` (montant choisi par l'utilisateur) sur la
+    probabilité de ruine et la concentration, puis envoie le rapport sur Telegram. Aucun montant n'est proposé."""
     alpha_data = await prediction_service.get_top_alpha_asset(session, str(user.id))
     if not alpha_data.get("found"):
-        return {"validated": False, "reason": "Aucun actif scoré disponible."}
+        return {"found": False, "reason": "Aucun actif scoré disponible."}
 
-    result = await validate_top_alpha(session, str(user.id), alpha_data, symbol, action)
+    result = await validate_top_alpha(session, str(user.id), alpha_data, symbol, amount_eur)
     chat_id = _telegram_chat(user)
     if chat_id:
         background_tasks.add_task(send_signal_report, chat_id=chat_id, user_id=str(user.id), result=result)
@@ -201,13 +190,13 @@ async def validate_signal(
 
 @router.get("/strategy-map", response_model=dict)
 async def get_strategy_map(background_tasks: BackgroundTasks, user: CurrentUser, session: Session) -> dict[str, Any]:
-    """Matrice de décision croisant scores alpha et phases de cycle ; récapitulatif Telegram s'il y a des achats ou
-    des ventes."""
+    """Lecture croisée scores alpha et phases de cycle, en constats descriptifs ; récapitulatif Telegram s'il y a des
+    configurations favorables ou défavorables."""
     result = await prediction_service.get_strategy_map(session, str(user.id))
     chat_id = _telegram_chat(user)
     if chat_id:
         summary = result.get("summary", {})
-        if summary.get("buys", 0) > 0 or summary.get("sells", 0) > 0:
+        if summary.get("favorable", 0) > 0 or summary.get("unfavorable", 0) > 0:
             background_tasks.add_task(
                 send_strategy_recap,
                 chat_id=chat_id,

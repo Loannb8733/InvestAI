@@ -18,7 +18,8 @@ class StrategySource(enum.StrEnum):
 
 
 class StrategyStatus(enum.StrEnum):
-    """``PROPOSED`` : suggérée par l'IA, pas encore acceptée."""
+    """``PROPOSED`` : héritage de l'ancienne génération automatique, suggestion jamais acceptée ni rejetée.
+    Plus aucune stratégie n'est créée dans ce statut."""
 
     PROPOSED = "PROPOSED"
     ACTIVE = "ACTIVE"
@@ -34,11 +35,11 @@ class ActionStatus(enum.StrEnum):
 
 
 class Strategy(Base):
-    """Stratégie saisie par l'utilisateur ou proposée par l'IA.
+    """Stratégie paramétrée par l'utilisateur, ou héritée de l'ancienne génération automatique (source ``AI``).
 
-    ``params`` dépend du type, par exemple ``{"type": "DCA", "amount": 100, "frequency": "weekly",
-    "assets": ["BTC", "ETH"]}`` ou ``{"type": "rebalance", "target_weights": {"BTC": 50, "ETH": 30}}`` ;
-    ``ai_reasoning``, ``market_regime`` et ``confidence`` figent le contexte IA au moment de la suggestion.
+    ``params`` d'un modèle porte une clé ``template`` (``dca``, ``vca``, ``profit_taking``, ``rebalance``, voir
+    ``schemas.TemplateParams``) ; une stratégie libre y met ce qu'elle veut ; les stratégies héritées ont une clé
+    ``type``. ``ai_reasoning``, ``market_regime`` et ``confidence`` ne sont renseignés que sur ces dernières.
     """
 
     __tablename__ = "strategies"

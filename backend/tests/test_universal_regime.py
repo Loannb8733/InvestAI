@@ -87,14 +87,13 @@ class TestFlashCrash:
         assert cfg.alpha_threshold >= 80, f"Bear alpha threshold should be >= 80, got {cfg.alpha_threshold}"
         assert cfg.risk_multiplier >= 1.0, f"Bear risk_multiplier should accumulate (>= 1.0), got {cfg.risk_multiplier}"
 
-    def test_achat_fort_blocked_in_bear_without_divergence(self):
-        """ACHAT FORT should be downgraded to DCA in bear without RSI divergence."""
-        action, desc, _ = STRATEGY_MATRIX[("high", "bottoming")]
-        assert action == "ACHAT FORT"
-        # But in get_strategy_map, bear validation at L2300-2312 downgrades:
-        # We test the matrix entry for markdown which gives DCA directly
-        action, desc, _ = STRATEGY_MATRIX[("high", "markdown")]
-        assert action == "DCA", f"High alpha + markdown should DCA, got {action}"
+    def test_high_alpha_in_markdown_is_not_read_as_favorable(self):
+        """High alpha in a markdown phase is a contrarian, still-bearish reading: neutral, never favorable."""
+        tone, _ = STRATEGY_MATRIX[("high", "bottoming")]
+        assert tone == "favorable"
+        tone, desc = STRATEGY_MATRIX[("high", "markdown")]
+        assert tone == "neutre", f"High alpha + markdown should read neutral, got {tone}"
+        assert "contrarien" in desc
 
 
 # ── Scénario B: Slow Bleed (Bear Market) ─────────────────────────
@@ -171,11 +170,10 @@ class TestMoonMissionBull:
         assert bull_low == pytest.approx(13.76, abs=0.01)
         assert bull_high == pytest.approx(34.40, abs=0.01)
 
-    def test_trailing_stop_in_markup(self):
-        """Strategy rows in markup should suggest trailing stop."""
-        action, desc, impact = STRATEGY_MATRIX[("high", "markup")]
-        assert action == "MAINTENIR"
-        # The trailing_stop field is added in get_strategy_map when regime is markup
+    def test_markup_reading_is_neutral(self):
+        """In markup, the reading describes the trend without any hold/sell instruction."""
+        tone, _ = STRATEGY_MATRIX[("high", "markup")]
+        assert tone == "neutre"
 
     def test_top_detection_during_parabolic(self):
         """Parabolic acceleration should eventually trigger top detection."""
@@ -189,12 +187,10 @@ class TestMoonMissionBull:
             f"Parabolic should have some top signal: top_prob={top_prob:.2f}, dom={result.dominant_regime}"
         )
 
-    def test_strategy_takes_profits_at_top(self):
-        """At top, even with high alpha → PRENDRE PROFITS."""
-        action, _, _ = STRATEGY_MATRIX[("high", "topping")]
-        assert action == "PRENDRE PROFITS"
-        action, _, _ = STRATEGY_MATRIX[("low", "topping")]
-        assert action == "VENDRE"
+    def test_topping_is_read_as_unfavorable(self):
+        """At top, even with high alpha, the configuration reads unfavorable."""
+        assert STRATEGY_MATRIX[("high", "topping")][0] == "défavorable"
+        assert STRATEGY_MATRIX[("low", "topping")][0] == "défavorable"
 
 
 # ── Cross-regime enforcement ─────────────────────────────────────

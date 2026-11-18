@@ -8,7 +8,7 @@
       "body": {
         "callback_query_id": "cb-2",
         "show_alert": true,
-        "text": "Simulation en cours, patientez 30s..."
+        "text": "Cette fonction a été retirée : InvestAI ne propose plus d'ordre ni de montant. Simulez vos propres montants depuis l'application."
       },
       "method": "answerCallbackQuery"
     }

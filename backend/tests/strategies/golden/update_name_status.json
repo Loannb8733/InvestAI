@@ -38,6 +38,7 @@
     "params": {
       "frequency": "monthly"
     },
+    "rule_summary": null,
     "source": "USER",
     "status": "PAUSED",
     "updated_at": "<volatile>",

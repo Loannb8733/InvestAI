@@ -1,6 +1,6 @@
 {
   "body": {
-    "action": "ACHAT",
+    "amount_eur": 250.0,
     "btc_correlation": null,
     "concentration_risk": false,
     "concentration_status": "SÉCURISÉE",
@@ -14,19 +14,17 @@
       "rsi_t7": 100.0
     },
     "ecart_eur": 1840.0,
-    "impact_pct": 0.0,
     "mc_after": {
-      "expected_return": -2.43,
+      "expected_return": -2.38,
       "prob_loss_10": 0.0,
-      "prob_positive": 8.5
+      "prob_positive": 8.9
     },
     "mc_before": {
       "expected_return": -2.43,
       "prob_loss_10": 0.0,
       "prob_positive": 8.5
     },
-    "order_eur": 0.0,
-    "post_purchase_weight_pct": 6.1,
+    "post_purchase_weight_pct": 6.5,
     "predicted_7d_pct": 0.62,
     "prediction_source": "ensemble",
     "prob_ruin_after": 0.0,
@@ -38,13 +36,12 @@
         "score": 68
       }
     ],
-    "rebalance_suggestion": null,
     "regime": "markup",
     "risk_impact": "Stable",
     "score": 68.3,
     "symbol": "AAPL",
+    "tone": "neutre",
     "total_portfolio_value": 65440.0,
-    "validated": false,
     "weight_overflow": false
   },
   "status": 200

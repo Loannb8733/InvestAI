@@ -117,7 +117,9 @@ export function usePredictionData() {
     let hitRate: number | null = backtestHitRate
     let source: 'backtest' | 'predictions' | null = backtestHitRate != null ? 'backtest' : null
     if (hitRate == null && predictions && predictions.length > 0) {
-      const sampled = predictions.filter(p => (p.hit_rate_n_samples ?? 0) > 0 && p.hit_rate != null)
+      const sampled = predictions.filter(
+        (p): p is typeof p & { hit_rate: number } => (p.hit_rate_n_samples ?? 0) > 0 && p.hit_rate != null
+      )
       if (sampled.length > 0) {
         hitRate = sampled.reduce((sum, p) => sum + p.hit_rate, 0) / sampled.length
         source = 'predictions'

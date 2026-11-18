@@ -1,0 +1,267 @@
+{
+  "body": [
+    {
+      "actions": [
+        {
+          "action": "BUY",
+          "amount": 40.0,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": null,
+          "id": "<id-15>",
+          "reason": "Échéance 1/4 : valeur visée 40,00 € ; la ligne part de zéro, achat de 40,00 €",
+          "scheduled_at": "2026-11-01T00:00:00Z",
+          "status": "PENDING",
+          "strategy_id": "<id-16>",
+          "symbol": "SOL"
+        },
+        {
+          "action": "BUY",
+          "amount": null,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": null,
+          "id": "<id-17>",
+          "reason": "Échéance 2/4 : valeur visée 80,00 € ; montant = valeur visée moins valeur de la ligne ce jour-là, plafonné à 60,00 € ; si la ligne dépasse déjà la cible, rien n'est acheté",
+          "scheduled_at": "2026-11-15T00:00:00Z",
+          "status": "PENDING",
+          "strategy_id": "<id-16>",
+          "symbol": "SOL"
+        },
+        {
+          "action": "BUY",
+          "amount": null,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": null,
+          "id": "<id-18>",
+          "reason": "Échéance 3/4 : valeur visée 120,00 € ; montant = valeur visée moins valeur de la ligne ce jour-là, plafonné à 60,00 € ; si la ligne dépasse déjà la cible, rien n'est acheté",
+          "scheduled_at": "2026-11-29T00:00:00Z",
+          "status": "PENDING",
+          "strategy_id": "<id-16>",
+          "symbol": "SOL"
+        },
+        {
+          "action": "BUY",
+          "amount": null,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": null,
+          "id": "<id-19>",
+          "reason": "Échéance 4/4 : valeur visée 160,00 € ; montant = valeur visée moins valeur de la ligne ce jour-là, plafonné à 60,00 € ; si la ligne dépasse déjà la cible, rien n'est acheté",
+          "scheduled_at": "2026-12-13T00:00:00Z",
+          "status": "PENDING",
+          "strategy_id": "<id-16>",
+          "symbol": "SOL"
+        }
+      ],
+      "ai_reasoning": null,
+      "confidence": null,
+      "created_at": "<volatile>",
+      "description": null,
+      "id": "<id-16>",
+      "market_regime": null,
+      "name": "VCA SOL",
+      "params": {
+        "allow_sell": false,
+        "frequency": "biweekly",
+        "max_per_period": 60.0,
+        "periods": 4,
+        "start_date": "2026-11-01",
+        "symbol": "SOL",
+        "target_increment": 40.0,
+        "template": "vca"
+      },
+      "rule_summary": "Value averaging sur SOL : la valeur visée de la ligne augmente de 40,00 € toutes les deux semaines, 4 échéances à partir du 01/11/2026 ; à chaque échéance on investit l'écart entre la cible et la valeur de la ligne, plafonné à 60,00 € par échéance ; aucune vente si la ligne dépasse la cible.",
+      "source": "USER",
+      "status": "ACTIVE",
+      "updated_at": "<volatile>",
+      "user_id": "<id-3>"
+    },
+    {
+      "actions": [
+        {
+          "action": "SELL",
+          "amount": 3000.0,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": null,
+          "id": "<id-12>",
+          "reason": "Palier 1 : si le cours atteint 60 000,00 €, vendre 25 % de la quantité indiquée, soit 0,05 BTC (≈ 3 000,00 €)",
+          "scheduled_at": null,
+          "status": "PENDING",
+          "strategy_id": "<id-13>",
+          "symbol": "BTC"
+        },
+        {
+          "action": "SELL",
+          "amount": 9000.0,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": null,
+          "id": "<id-14>",
+          "reason": "Palier 2 : si le cours atteint 90 000,00 €, vendre 50 % de la quantité indiquée, soit 0,1 BTC (≈ 9 000,00 €)",
+          "scheduled_at": null,
+          "status": "PENDING",
+          "strategy_id": "<id-13>",
+          "symbol": "BTC"
+        }
+      ],
+      "ai_reasoning": null,
+      "confidence": null,
+      "created_at": "<volatile>",
+      "description": null,
+      "id": "<id-13>",
+      "market_regime": null,
+      "name": "Paliers BTC",
+      "params": {
+        "quantity": 0.2,
+        "symbol": "BTC",
+        "template": "profit_taking",
+        "tiers": [
+          {
+            "price": 60000.0,
+            "sell_pct": 25.0
+          },
+          {
+            "price": 90000.0,
+            "sell_pct": 50.0
+          }
+        ]
+      },
+      "rule_summary": "Prise de profits par paliers sur 0,2 BTC : 25 % à 60 000,00 €, 50 % à 90 000,00 € (75 % de la quantité au total).",
+      "source": "USER",
+      "status": "ACTIVE",
+      "updated_at": "<volatile>",
+      "user_id": "<id-3>"
+    },
+    {
+      "actions": [
+        {
+          "action": "BUY",
+          "amount": 35.0,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": "2026-10-17T12:00:00Z",
+          "id": "<id-5>",
+          "reason": "Échéance 1/3 : 35,00 € sur BTC (70 % de 50,00 €)",
+          "scheduled_at": "2026-11-01T00:00:00Z",
+          "status": "EXECUTED",
+          "strategy_id": "<id-6>",
+          "symbol": "BTC"
+        },
+        {
+          "action": "BUY",
+          "amount": 15.0,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": null,
+          "id": "<id-7>",
+          "reason": "Échéance 1/3 : 15,00 € sur ETH (30 % de 50,00 €)",
+          "scheduled_at": "2026-11-01T00:00:00Z",
+          "status": "PENDING",
+          "strategy_id": "<id-6>",
+          "symbol": "ETH"
+        },
+        {
+          "action": "BUY",
+          "amount": 35.0,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": null,
+          "id": "<id-8>",
+          "reason": "Échéance 2/3 : 35,00 € sur BTC (70 % de 50,00 €)",
+          "scheduled_at": "2026-12-01T00:00:00Z",
+          "status": "PENDING",
+          "strategy_id": "<id-6>",
+          "symbol": "BTC"
+        },
+        {
+          "action": "BUY",
+          "amount": 15.0,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": null,
+          "id": "<id-9>",
+          "reason": "Échéance 2/3 : 15,00 € sur ETH (30 % de 50,00 €)",
+          "scheduled_at": "2026-12-01T00:00:00Z",
+          "status": "PENDING",
+          "strategy_id": "<id-6>",
+          "symbol": "ETH"
+        },
+        {
+          "action": "BUY",
+          "amount": 35.0,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": null,
+          "id": "<id-10>",
+          "reason": "Échéance 3/3 : 35,00 € sur BTC (70 % de 50,00 €)",
+          "scheduled_at": "2027-01-01T00:00:00Z",
+          "status": "PENDING",
+          "strategy_id": "<id-6>",
+          "symbol": "BTC"
+        },
+        {
+          "action": "BUY",
+          "amount": 15.0,
+          "created_at": "<volatile>",
+          "currency": "EUR",
+          "executed_at": null,
+          "id": "<id-11>",
+          "reason": "Échéance 3/3 : 15,00 € sur ETH (30 % de 50,00 €)",
+          "scheduled_at": "2027-01-01T00:00:00Z",
+          "status": "PENDING",
+          "strategy_id": "<id-6>",
+          "symbol": "ETH"
+        }
+      ],
+      "ai_reasoning": null,
+      "confidence": null,
+      "created_at": "<volatile>",
+      "description": null,
+      "id": "<id-6>",
+      "market_regime": null,
+      "name": "DCA BTC/ETH",
+      "params": {
+        "amount_per_period": 50.0,
+        "assets": [
+          {
+            "symbol": "BTC",
+            "weight_pct": 70.0
+          },
+          {
+            "symbol": "ETH",
+            "weight_pct": 30.0
+          }
+        ],
+        "frequency": "monthly",
+        "periods": 3,
+        "start_date": "2026-11-01",
+        "template": "dca"
+      },
+      "rule_summary": "Achat périodique : 50,00 € chaque mois, 3 échéances à partir du 01/11/2026, répartis BTC 70 % · ETH 30 %.",
+      "source": "USER",
+      "status": "ACTIVE",
+      "updated_at": "<volatile>",
+      "user_id": "<id-3>"
+    },
+    {
+      "actions": [],
+      "ai_reasoning": null,
+      "confidence": null,
+      "created_at": "<volatile>",
+      "description": null,
+      "id": "<id-4>",
+      "market_regime": null,
+      "name": "Vide",
+      "params": {},
+      "rule_summary": null,
+      "source": "USER",
+      "status": "ACTIVE",
+      "updated_at": "<volatile>",
+      "user_id": "<id-3>"
+    }
+  ],
+  "status": 200
+}

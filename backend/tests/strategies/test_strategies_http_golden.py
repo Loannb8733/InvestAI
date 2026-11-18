@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.identity.models import User
 from app.domains.identity.tokens import create_token
 from tests.sample_portfolio import FROZEN_NOW, seed_history, seed_portfolio
+from tests.strategies.legacy import seed_legacy_ai_strategies
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
 UPDATE = os.environ.get("GOLDEN_UPDATE") == "1"
@@ -104,16 +105,85 @@ async def _user_strategy_flow(rec: _Recorder, headers: dict[str, str], other: di
     await rec.shot("delete_again", "DELETE", f"{BASE}/{sid}", headers)
 
 
-async def _ai_flow(rec: _Recorder, headers: dict[str, str], other: dict[str, str]) -> None:
+DCA = {
+    "template": "dca",
+    "assets": [{"symbol": "BTC", "weight_pct": 70}, {"symbol": "eth", "weight_pct": 30}],
+    "amount_per_period": 50,
+    "frequency": "monthly",
+    "periods": 3,
+    "start_date": "2026-11-01",
+}
+VCA = {
+    "template": "vca",
+    "symbol": "SOL",
+    "target_increment": 40,
+    "max_per_period": 60,
+    "frequency": "biweekly",
+    "periods": 4,
+    "start_date": "2026-11-01",
+}
+PROFIT_TAKING = {
+    "template": "profit_taking",
+    "symbol": "BTC",
+    "quantity": 0.2,
+    "tiers": [{"price": 90000, "sell_pct": 50}, {"price": 60000, "sell_pct": 25}],
+}
+REBALANCE = {
+    "template": "rebalance",
+    "lines": [
+        {"symbol": "BTC", "target_pct": 60, "current_value": 900},
+        {"symbol": "ETH", "target_pct": 40, "current_value": 300},
+    ],
+    "contribution": 100,
+    "threshold_pct": 5,
+    "frequency": "quarterly",
+    "periods": 3,
+    "start_date": "2026-11-01",
+}
+
+
+async def _template_flow(rec: _Recorder, headers: dict[str, str]) -> None:
+    sim = f"{BASE}/simulate"
+    await rec.shot("simulate_dca", "POST", sim, headers, {"params": DCA, "backtest_start": "2026-01-15"})
+    await rec.shot("simulate_vca", "POST", sim, headers, {"params": VCA, "backtest_start": "2026-03-01"})
+    await rec.shot(
+        "simulate_profit_taking", "POST", sim, headers, {"params": PROFIT_TAKING, "backtest_start": "2025-10-01"}
+    )
+    await rec.shot("simulate_rebalance", "POST", sim, headers, {"params": REBALANCE, "backtest_start": "2026-01-01"})
+    await rec.shot("simulate_without_backtest", "POST", sim, headers, {"params": DCA})
+    no_history = {**PROFIT_TAKING, "symbol": "XYZ"}
+    await rec.shot("simulate_no_history", "POST", sim, headers, {"params": no_history, "backtest_start": "2026-01-01"})
+    bad_weights = {**DCA, "assets": [{"symbol": "BTC", "weight_pct": 70}]}
+    await rec.shot("simulate_bad_weights", "POST", sim, headers, {"params": bad_weights})
+    await rec.shot("simulate_unknown_template", "POST", sim, headers, {"params": {"template": "conviction_buy"}})
+    dca = await rec.shot(
+        "from_template_dca", "POST", f"{BASE}/from-template", headers, {"name": "DCA BTC/ETH", "params": DCA}
+    )
+    await rec.shot(
+        "from_template_profit_taking",
+        "POST",
+        f"{BASE}/from-template",
+        headers,
+        {"name": "Paliers BTC", "params": PROFIT_TAKING},
+    )
+    await rec.shot("from_template_vca", "POST", f"{BASE}/from-template", headers, {"name": "VCA SOL", "params": VCA})
+    first = dca["actions"][0]["id"]
+    await rec.shot("from_template_execute", "PATCH", f"{BASE}/actions/{first}", headers, {"status": "EXECUTED"})
+    await rec.shot("from_template_performance", "GET", f"{BASE}/{dca['id']}/performance", headers)
+    await rec.shot("list_templates", "GET", BASE, headers)
+
+
+async def _legacy_flow(
+    rec: _Recorder, headers: dict[str, str], other: dict[str, str], db: AsyncSession, user: User
+) -> None:
+    proposed, accepted = await seed_legacy_ai_strategies(db, user)
     await rec.shot("ai_suggest", "POST", f"{BASE}/ai-suggest", headers)
-    suggested = await rec.shot("ai_suggest_again", "POST", f"{BASE}/ai-suggest", headers)
-    await rec.shot("ai_suggest_empty_user", "POST", f"{BASE}/ai-suggest", other)
-    if suggested:
-        first, last = suggested[0]["id"], suggested[-1]["id"]
-        await rec.shot("accept", "PATCH", f"{BASE}/{first}/accept", headers)
-        await rec.shot("reject", "PATCH", f"{BASE}/{last}/reject", headers)
-        await rec.shot("accept_other_user", "PATCH", f"{BASE}/{first}/accept", other)
-        await rec.shot("delete_ai", "DELETE", f"{BASE}/{first}", headers)
+    await rec.shot("legacy_list", "GET", BASE, headers)
+    await rec.shot("legacy_performance", "GET", f"{BASE}/{accepted.id}/performance", headers)
+    await rec.shot("accept", "PATCH", f"{BASE}/{proposed.id}/accept", headers)
+    await rec.shot("reject", "PATCH", f"{BASE}/{proposed.id}/reject", headers)
+    await rec.shot("accept_other_user", "PATCH", f"{BASE}/{proposed.id}/accept", other)
+    await rec.shot("delete_ai", "DELETE", f"{BASE}/{proposed.id}", headers)
     await rec.shot("reject_unknown", "PATCH", f"{BASE}/{UNKNOWN_ID}/reject", headers)
     await rec.shot("list_after_ai", "GET", BASE, headers)
 
@@ -129,6 +199,7 @@ async def test_strategies_routes_match_golden(
         await seed_history(db_session)
         await seed_portfolio(client, headers)
         await _user_strategy_flow(rec, headers, other)
-        await _ai_flow(rec, headers, other)
+        await _template_flow(rec, headers)
+        await _legacy_flow(rec, headers, other, db_session, regular_user)
         await rec.shot("unauthenticated", "GET", BASE, {})
     assert not rec.mismatches, f"golden strategies différent : {rec.mismatches} (GOLDEN_UPDATE=1 pour accepter)"

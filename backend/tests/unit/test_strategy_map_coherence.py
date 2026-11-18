@@ -1,118 +1,108 @@
-"""Tests for strategy map decision matrix coherence.
+"""La lecture Alpha × Cycle reste de l'information générale.
 
-Validates that:
-1. Alpha High + Cycle Bottom = ACHAT FORT (strongest buy signal).
-2. Alpha Low + Cycle Top = VENDRE (strongest sell signal).
-3. All 12 matrix cells produce valid actions.
-4. Impact percentages are signed correctly (buy=positive, sell=negative).
-5. Summary counters are consistent with rows.
+Contrat vérifié :
+1. Chaque cellule de la matrice donne une tonalité (favorable, neutre, défavorable) et un constat descriptif.
+2. Aucun constat ne contient de verbe d'action (acheter, vendre, alléger…) ni de montant.
+3. Les lignes produites n'exposent ni action, ni impact chiffré, ni montant à engager.
+4. Le résumé compte les tonalités et colle aux lignes.
+5. En marché global baissier, une configuration favorable sans divergence RSI est ramenée à neutre.
 """
+
+import re
 
 import pytest
 
-from app.domains.predictions.strategy_map import STRATEGY_MATRIX
+from app.domains.predictions.strategy_map import (
+    FAVORABLE,
+    NEUTRAL,
+    STRATEGY_MATRIX,
+    TONES,
+    UNFAVORABLE,
+    strategy_map,
+)
+
+ADVICE_WORDS = re.compile(
+    r"\b(achat|achetez|acheter|vendre|vendez|vente|allég|prendre profits|prenez|renforcer|renforcez|accumuler|"
+    r"accumulez|sortir|sécuriser|investir|investissez|DCA|stop-loss)\b",
+    re.IGNORECASE,
+)
 
 
 class TestStrategyMatrix:
-    """Test the STRATEGY_MATRIX decision table directly."""
+    def test_every_cell_is_a_tone_and_a_description(self) -> None:
+        for key, (tone, description) in STRATEGY_MATRIX.items():
+            assert tone in TONES, key
+            assert isinstance(description, str) and description, key
 
-    def test_high_alpha_bottom_cycle_is_strong_buy(self):
-        """Alpha high + cycle bottom → ACHAT FORT."""
-        action, desc, impact = STRATEGY_MATRIX[("high", "bottom")]
-        assert action == "ACHAT FORT"
-        assert impact > 0
+    def test_no_cell_tells_the_user_what_to_do(self) -> None:
+        for key, (_tone, description) in STRATEGY_MATRIX.items():
+            assert not ADVICE_WORDS.search(description), f"{key}: « {description} » formule une consigne"
+            assert "€" not in description and "%" not in description, f"{key}: montant ou pourcentage"
 
-    def test_low_alpha_top_cycle_is_sell(self):
-        """Alpha low + cycle top → VENDRE."""
-        action, desc, impact = STRATEGY_MATRIX[("low", "top")]
-        assert action == "VENDRE"
-        assert impact < 0
+    def test_all_12_core_cells_exist(self) -> None:
+        for alpha in ("high", "medium", "low"):
+            for regime in ("bottom", "bearish", "bullish", "top"):
+                assert (alpha, regime) in STRATEGY_MATRIX
 
-    def test_high_alpha_top_cycle_takes_profits(self):
-        """Alpha high + cycle top → PRENDRE PROFITS."""
-        action, desc, impact = STRATEGY_MATRIX[("high", "top")]
-        assert action == "PRENDRE PROFITS"
-        assert impact < 0
-
-    def test_medium_alpha_bottom_cycle_dca(self):
-        """Alpha medium + cycle bottom → DCA."""
-        action, desc, impact = STRATEGY_MATRIX[("medium", "bottom")]
-        assert action == "DCA"
-        assert impact > 0
-
-    def test_all_12_cells_exist_and_valid(self):
-        """All 12 (alpha_level × regime) combinations produce valid entries."""
-        alpha_levels = ["high", "medium", "low"]
-        regimes = ["bottom", "bearish", "bullish", "top"]
-        for alpha in alpha_levels:
-            for regime in regimes:
-                key = (alpha, regime)
-                assert key in STRATEGY_MATRIX, f"Missing key {key}"
-                action, desc, impact = STRATEGY_MATRIX[key]
-                assert isinstance(action, str) and len(action) > 0
-                assert isinstance(desc, str)
-                assert isinstance(impact, float)
-
-    def test_buy_actions_have_positive_impact(self):
-        """Actions containing ACHAT or DCA should have positive impact."""
-        for key, (action, desc, impact) in STRATEGY_MATRIX.items():
-            if "ACHAT" in action or action == "DCA":
-                assert impact > 0, f"{key}: {action} should have positive impact, got {impact}"
-
-    def test_sell_actions_have_negative_impact(self):
-        """Actions containing VENDRE, PROFITS, or ALLÉGER should have negative impact."""
-        for key, (action, desc, impact) in STRATEGY_MATRIX.items():
-            if "VENDRE" in action or "PROFITS" in action or "ALLÉGER" in action:
-                assert impact < 0, f"{key}: {action} should have negative impact, got {impact}"
-
-    def test_hold_actions_have_zero_impact(self):
-        """MAINTENIR, ATTENDRE, OBSERVER, CONSERVER should have zero impact."""
-        zero_actions = {"MAINTENIR", "ATTENDRE", "OBSERVER", "CONSERVER", "ÉVITER"}
-        for key, (action, desc, impact) in STRATEGY_MATRIX.items():
-            if action in zero_actions:
-                assert impact == 0.0, f"{key}: {action} should have 0 impact, got {impact}"
+    @pytest.mark.parametrize(
+        ("key", "tone"),
+        [
+            (("high", "bottom"), FAVORABLE),
+            (("medium", "bottom"), FAVORABLE),
+            (("low", "top"), UNFAVORABLE),
+            (("high", "top"), UNFAVORABLE),
+            (("high", "bullish"), NEUTRAL),
+        ],
+    )
+    def test_reference_cells_keep_their_reading(self, key: tuple[str, str], tone: str) -> None:
+        assert STRATEGY_MATRIX[key][0] == tone
 
 
-class TestAlphaLevelClassification:
-    """Test alpha level thresholds."""
-
-    def test_score_60_plus_is_high(self):
-        assert 60 >= 60  # high threshold
-        assert 80 >= 60
-
-    def test_score_30_to_59_is_medium(self):
-        assert 30 >= 30 and 30 < 60
-        assert 45 >= 30 and 45 < 60
-
-    def test_score_below_30_is_low(self):
-        assert 15 < 30
-        assert 0 < 30
+def _alpha(*scores: tuple[str, float]) -> dict[str, object]:
+    return {
+        "all_scores": [
+            {"symbol": sym, "score": score, "value": 1000.0, "weight_pct": 10.0, "reasons": []} for sym, score in scores
+        ],
+        "total_portfolio_value": 10_000.0,
+    }
 
 
-class TestSummaryCoherence:
-    """Test that summary counters match row actions."""
+def _cycle(dominant: str, per_asset: dict[str, str]) -> dict[str, object]:
+    return {
+        "market_regime": {"dominant_regime": dominant},
+        "per_asset": [{"symbol": s, "regime_6phase": r, "confidence": 0.7} for s, r in per_asset.items()],
+        "fear_greed": 40,
+    }
 
-    def test_summary_counts_match_actions(self):
-        """Verify counting logic for buys/sells/holds."""
-        rows = [
-            {"action": "ACHAT FORT"},
-            {"action": "DCA"},
-            {"action": "VENDRE"},
-            {"action": "PRENDRE PROFITS"},
-            {"action": "MAINTENIR"},
-            {"action": "ATTENDRE"},
-            {"action": "ALLÉGER"},
-        ]
-        buys = sum(1 for r in rows if "ACHAT" in r["action"] or r["action"] == "DCA")
-        sells = sum(1 for r in rows if "VENDRE" in r["action"] or "PROFITS" in r["action"] or "ALLÉGER" in r["action"])
-        holds = len(rows) - buys - sells
 
-        assert buys == 2  # ACHAT FORT + DCA
-        assert sells == 3  # VENDRE + PRENDRE PROFITS + ALLÉGER
-        assert holds == 2  # MAINTENIR + ATTENDRE
+class TestStrategyMapRows:
+    def test_rows_expose_no_action_amount_or_impact(self) -> None:
+        result = strategy_map(_alpha(("BTC", 95.0), ("ETH", 10.0)), _cycle("bullish", {"BTC": "bottom", "ETH": "top"}))
+        for row in result["rows"]:
+            assert row["tone"] in TONES
+            for forbidden in ("action", "impact_pct", "impact_eur", "order_eur", "trailing_stop"):
+                assert forbidden not in row
 
-    def test_impact_accumulation(self):
-        """Total impact is the sum of per-asset impacts."""
-        impacts = [5.0, -2.0, 0.0, 3.0, -5.0]
-        total = sum(impacts)
-        assert total == pytest.approx(1.0)
+    def test_summary_counts_tones(self) -> None:
+        result = strategy_map(
+            _alpha(("BTC", 95.0), ("ETH", 10.0), ("SOL", 50.0)),
+            _cycle("bullish", {"BTC": "bottom", "ETH": "top", "SOL": "markup"}),
+        )
+        tones = [row["tone"] for row in result["rows"]]
+        assert result["summary"] == {
+            "favorable": tones.count(FAVORABLE),
+            "neutral": tones.count(NEUTRAL),
+            "unfavorable": tones.count(UNFAVORABLE),
+        }
+
+    def test_bear_market_without_divergence_tones_down_favorable(self) -> None:
+        result = strategy_map(_alpha(("BTC", 99.0)), _cycle("bearish", {"BTC": "bottom"}))
+        row = result["rows"][0]
+        assert row["tone"] == NEUTRAL
+        assert "divergence RSI non confirmée" in row["description"]
+
+    def test_bear_market_with_divergence_keeps_favorable(self) -> None:
+        alpha = _alpha(("BTC", 99.0))
+        alpha["all_scores"][0]["reasons"] = [{"label": "Divergence Haussière", "detail": "RSI"}]  # type: ignore[index]
+        result = strategy_map(alpha, _cycle("bearish", {"BTC": "bottom"}))
+        assert result["rows"][0]["tone"] == FAVORABLE

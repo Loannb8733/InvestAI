@@ -1,148 +1,61 @@
-"""Tests for cycle advice coherence and risk guard.
+"""Les repères de cycle restent de l'information générale.
 
-Validates that:
-1. Extreme Fear → accumulation (DCA), not selling.
-2. Extreme Greed → profit-taking, not buying.
-3. High risk concentration → DIVERSIFIER warning.
-4. DCA hints include EUR amounts when portfolio_value is provided.
+Contrat vérifié :
+1. Chaque phase produit des repères descriptifs (CONTEXTE, RISQUE, HISTORIQUE), jamais une consigne.
+2. Aucun texte ne contient de montant en euros, quel que soit le portefeuille.
+3. Une concentration de risque au-delà de 60 % produit un constat CONCENTRATION de priorité critique.
 """
 
 import re
 
 import pytest
 
-from app.domains.predictions.cycle_advice import cycle_advice
+from app.domains.predictions.cycle_advice import CONCENTRATION, CONTEXT, HISTORY, RISK, cycle_advice
+
+THEMES = {CONCENTRATION, CONTEXT, HISTORY, RISK}
+IMPERATIVES = re.compile(
+    r"\b(achetez|vendez|prenez|placez|accumulez|renforcez|réduisez|évitez|investissez|n'achetez|attendez|"
+    r"préparez|remontez|identifiez|privilégiez|sécurisez)\b",
+    re.IGNORECASE,
+)
+
+PHASES = [
+    ("bottom", 25),
+    ("bearish", 30),
+    ("bearish", 10),
+    ("top", 60),
+    ("bullish", 90),
+    ("bullish", 60),
+    ("unknown", 50),
+]
 
 
-def _amount_range(description: str) -> tuple[float, float]:
-    """Extract the suggested DCA tranche range (low, high) in € from advice text."""
-    m = re.search(r"(\d+)\D+(\d+)\s*€", description)
-    assert m, f"no '<low>–<high> €' range found in: {description}"
-    return float(m.group(1)), float(m.group(2))
+@pytest.mark.parametrize(("regime", "fear_greed"), PHASES)
+@pytest.mark.parametrize("portfolio_value", [0.0, 863.90, 100_000.0])
+def test_advice_is_descriptive_without_amounts(regime: str, fear_greed: int, portfolio_value: float) -> None:
+    advice = cycle_advice(regime=regime, cycle_pos=50, fear_greed=fear_greed, portfolio_value=portfolio_value)
+    assert advice
+    for item in advice:
+        assert item["action"] in THEMES, item
+        text = f"{item['title']} {item['description']}"
+        assert "€" not in text, f"montant dans : {text}"
+        assert not IMPERATIVES.search(text), f"consigne dans : {text}"
 
 
-class TestCycleAdviceCoherence:
-    """Test cycle_advice directly."""
+def test_high_concentration_is_reported_as_critical() -> None:
+    advice = cycle_advice(regime="bottom", cycle_pos=10, fear_greed=15, portfolio_value=863.90, max_risk_weight=75.0)
+    concentration = [a for a in advice if a["action"] == CONCENTRATION]
+    assert concentration and concentration[0]["priority"] == "critical"
+    assert "75 %" in concentration[0]["description"]
 
-    def test_extreme_fear_suggests_accumulation(self):
-        """Extreme Fear (F&G < 20) must suggest DCA, never VENDRE."""
-        advice = cycle_advice(
-            regime="bearish",
-            cycle_pos=85,
-            fear_greed=10,  # Extreme Fear
-            portfolio_value=863.90,
-        )
-        actions = [a["action"] for a in advice]
-        assert "DCA" in actions, f"Expected DCA in {actions}"
-        assert "VENDRE" not in actions, "Should not suggest selling during Extreme Fear"
 
-    def test_bottom_regime_suggests_dca(self):
-        """Bottom regime must always suggest DCA accumulation."""
-        advice = cycle_advice(
-            regime="bottom",
-            cycle_pos=10,
-            fear_greed=25,
-            portfolio_value=1000.0,
-        )
-        actions = [a["action"] for a in advice]
-        assert "DCA" in actions
-        # Must include DCA hint with EUR amounts
-        dca_items = [a for a in advice if a["action"] == "DCA"]
-        assert any("€" in a["description"] for a in dca_items), "DCA advice should include EUR amount suggestion"
+def test_no_concentration_warning_when_balanced() -> None:
+    advice = cycle_advice(regime="bottom", cycle_pos=10, fear_greed=15, portfolio_value=863.90, max_risk_weight=30.0)
+    assert all(a["action"] != CONCENTRATION for a in advice)
 
-    def test_extreme_greed_suggests_profit_taking(self):
-        """Extreme Greed (F&G > 80) must suggest VENDRE, not buying."""
-        advice = cycle_advice(
-            regime="bullish",
-            cycle_pos=75,
-            fear_greed=90,  # Extreme Greed
-            portfolio_value=5000.0,
-        )
-        actions = [a["action"] for a in advice]
-        assert "VENDRE" in actions, f"Expected VENDRE in {actions}"
-        assert "DCA" not in actions, "Should not suggest buying during Extreme Greed"
 
-    def test_high_concentration_warns_diversify(self):
-        """When max_risk_weight > 60%, must warn DIVERSIFIER."""
-        advice = cycle_advice(
-            regime="bottom",
-            cycle_pos=10,
-            fear_greed=15,
-            portfolio_value=863.90,
-            max_risk_weight=75.0,  # 75% risk in single asset
-        )
-        actions = [a["action"] for a in advice]
-        assert "DIVERSIFIER" in actions, f"Expected DIVERSIFIER warning in {actions}"
-        # DIVERSIFIER should be critical priority
-        diversify = [a for a in advice if a["action"] == "DIVERSIFIER"]
-        assert diversify[0]["priority"] == "critical"
-
-    def test_no_concentration_warning_when_balanced(self):
-        """No DIVERSIFIER warning when risk is well-distributed."""
-        advice = cycle_advice(
-            regime="bottom",
-            cycle_pos=10,
-            fear_greed=15,
-            portfolio_value=863.90,
-            max_risk_weight=30.0,  # Balanced
-        )
-        actions = [a["action"] for a in advice]
-        assert "DIVERSIFIER" not in actions
-
-    def test_dca_amount_scales_with_portfolio(self):
-        """DCA suggestion amounts are proportional to portfolio value.
-
-        Asserts the *scaling relationship* (10x portfolio -> 100x tranche, since
-        100000/1000 = 100) rather than hard-coding the regime multiplier, so the
-        test survives retuning of RegimeConfig.risk_multiplier.
-        """
-        advice_small = cycle_advice(
-            regime="bottom",
-            cycle_pos=10,
-            fear_greed=15,
-            portfolio_value=1000.0,
-        )
-        advice_large = cycle_advice(
-            regime="bottom",
-            cycle_pos=10,
-            fear_greed=15,
-            portfolio_value=100000.0,
-        )
-        dca_small = [a for a in advice_small if a["action"] == "DCA"][0]
-        dca_large = [a for a in advice_large if a["action"] == "DCA"][0]
-        low_s, high_s = _amount_range(dca_small["description"])
-        low_l, high_l = _amount_range(dca_large["description"])
-        # 100x portfolio -> 100x tranche, on both ends of the range.
-        assert low_l == pytest.approx(low_s * 100, rel=0.01), f"{low_l} vs {low_s}*100"
-        assert high_l == pytest.approx(high_s * 100, rel=0.01), f"{high_l} vs {high_s}*100"
-        # Sanity: range is a real interval (low < high) and tranche is a sane % of portfolio.
-        assert 0 < low_s < high_s
-        assert high_s < 1000.0, "single DCA tranche should be a fraction of the portfolio"
-
-    def test_bearish_regime_no_panic_sell(self):
-        """Bearish regime accumulates (DCA/VCA), never panic-sells.
-
-        Product philosophy (commit 94e1ac4): bear = accumulate, bull = take profits.
-        A bearish regime must therefore advise spread-out buying, not selling.
-        """
-        advice = cycle_advice(
-            regime="bearish",
-            cycle_pos=80,
-            fear_greed=30,
-            portfolio_value=863.90,
-        )
-        actions = [a["action"] for a in advice]
-        assert "VENDRE" not in actions, "Bearish should not trigger panic sell"
-        assert "DCA" in actions or "VCA" in actions, f"Bearish should accumulate: {actions}"
-
-    def test_no_dca_amount_without_portfolio_value(self):
-        """Without portfolio value, DCA advice has no EUR amount."""
-        advice = cycle_advice(
-            regime="bottom",
-            cycle_pos=10,
-            fear_greed=15,
-            portfolio_value=0.0,
-        )
-        dca_items = [a for a in advice if a["action"] == "DCA"]
-        for a in dca_items:
-            assert "€" not in a["description"], "No EUR amount without portfolio value"
+def test_extreme_fear_and_greed_pick_the_matching_phase() -> None:
+    fear = cycle_advice(regime="bullish", cycle_pos=50, fear_greed=10)
+    greed = cycle_advice(regime="bearish", cycle_pos=50, fear_greed=90)
+    assert fear[0]["title"] == "Phase de creux potentiel"
+    assert greed[0]["title"] == "Marché baissier"

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { strategiesApi } from '@/services/api'
 import { toast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,13 +14,16 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import StrategyPerformancePanel from './StrategyPerformancePanel'
+import StrategySimulator from './StrategySimulator'
+import { ACTION_LABELS } from './simulatorModel'
 import {
-  Brain,
+  Archive,
+  CalendarClock,
+  Calculator,
   Plus,
   Check,
   X,
   Loader2,
-  Sparkles,
   TrendingUp,
   TrendingDown,
   Shield,
@@ -29,7 +32,7 @@ import {
   ChevronUp,
   CircleDot,
   Trash2,
-  Wallet,
+  History,
 } from 'lucide-react'
 
 // Types
@@ -55,6 +58,7 @@ interface Strategy {
   source: 'AI' | 'USER'
   status: string
   params: Record<string, unknown>
+  rule_summary: string | null
   ai_reasoning: string | null
   market_regime: string | null
   confidence: number | null
@@ -64,7 +68,7 @@ interface Strategy {
 }
 
 const STATUS_BADGE: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  PROPOSED: { label: 'Proposée', variant: 'secondary' },
+  PROPOSED: { label: 'Non traitée', variant: 'secondary' },
   ACTIVE: { label: 'Active', variant: 'default' },
   PAUSED: { label: 'En pause', variant: 'outline' },
   COMPLETED: { label: 'Terminée', variant: 'secondary' },
@@ -78,56 +82,38 @@ const ACTION_BADGE: Record<string, { label: string; variant: 'default' | 'second
 }
 
 function getStrategyIcon(params: Record<string, unknown>) {
-  const type = (params?.type as string) || ''
+  const type = String(params?.template ?? params?.type ?? '')
   if (type.includes('defensive') || type.includes('observation')) return Shield
   if (type.includes('profit')) return TrendingDown
   if (type.includes('rebalance')) return RefreshCw
+  if (type === 'dca' || type === 'vca') return CalendarClock
   return TrendingUp
-}
-
-const RISK_LABELS: Record<number, { label: string; color: string }> = {
-  1: { label: 'Conservateur', color: 'text-gain border-gain/30' },
-  2: { label: 'Modéré', color: 'text-accent border-accent/30' },
-  3: { label: 'Dynamique', color: 'text-warning border-warning/30' },
-  4: { label: 'Agressif', color: 'text-loss border-loss/30' },
-}
-
-const PERF_LABELS: Record<number, string> = {
-  1: 'Faible',
-  2: 'Moyen',
-  3: 'Élevé',
-  4: 'Très élevé',
 }
 
 function StrategyCard({
   strategy,
-  onAccept,
   onReject,
   onDelete,
   onMarkAction,
   onUpdateAmount,
 }: {
   strategy: Strategy
-  onAccept: (id: string) => void
   onReject: (id: string) => void
   onDelete: (id: string) => void
   onMarkAction: (actionId: string, status: string) => void
   onUpdateAmount: (actionId: string, amount: number) => void
 }) {
-  const [expanded, setExpanded] = useState(strategy.status === 'PROPOSED')
+  const [expanded, setExpanded] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editAmount, setEditAmount] = useState('')
   const Icon = getStrategyIcon(strategy.params)
   const statusBadge = STATUS_BADGE[strategy.status] || STATUS_BADGE.ACTIVE
   const pendingActions = strategy.actions.filter((a) => a.status === 'PENDING')
   const hasExecuted = strategy.actions.some((a) => a.status === 'EXECUTED')
-  const riskLevel = (strategy.params?.risk_level as number) || 0
-  const perfLevel = (strategy.params?.performance_potential as number) || 0
-  const riskInfo = RISK_LABELS[riskLevel]
-  const perfLabel = PERF_LABELS[perfLevel]
+  const isLegacy = strategy.source === 'AI'
 
   return (
-    <Card elevation="raised" className={strategy.status === 'PROPOSED' ? 'border-accent/30 bg-accent/5' : ''}>
+    <Card elevation="raised">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -138,50 +124,30 @@ function StrategyCard({
               <div className="flex items-center gap-2 flex-wrap">
                 <CardTitle className="text-base">{strategy.name}</CardTitle>
                 <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
-                {strategy.source === 'AI' && (
-                  <Badge variant="outline" className="text-accent border-accent/30">
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    IA
-                  </Badge>
-                )}
-                {strategy.market_regime && (
+                {isLegacy && (
                   <Badge variant="outline" className="text-xs">
-                    {strategy.market_regime}
-                    {strategy.confidence ? ` · ${(strategy.confidence * 100).toFixed(0)}%` : ''}
-                  </Badge>
-                )}
-                {riskInfo && (
-                  <Badge variant="outline" className={`text-xs ${riskInfo.color}`}>
-                    {riskInfo.label}
-                  </Badge>
-                )}
-                {perfLabel && (
-                  <Badge variant="outline" className="text-xs">
-                    Perf. {perfLabel}
+                    <History className="h-3 w-3 mr-1" />
+                    Ancienne suggestion
                   </Badge>
                 )}
               </div>
-              {strategy.description && (
+              {strategy.rule_summary && <p className="text-sm text-muted-foreground mt-1">{strategy.rule_summary}</p>}
+              {strategy.description && strategy.description !== strategy.rule_summary && (
                 <p className="text-sm text-muted-foreground mt-1">{strategy.description}</p>
               )}
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {strategy.status === 'PROPOSED' && (
-              <>
-                <Button size="sm" variant="default" onClick={() => onAccept(strategy.id)}>
-                  <Check className="h-4 w-4 mr-1" />
-                  Accepter
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onReject(strategy.id)}
-                  aria-label={`Rejeter la stratégie ${strategy.name}`}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onReject(strategy.id)}
+                aria-label={`Archiver la stratégie ${strategy.name}`}
+              >
+                <Archive className="h-4 w-4 mr-1" />
+                Archiver
+              </Button>
             )}
             {strategy.source === 'USER' && (
               <Button
@@ -208,26 +174,11 @@ function StrategyCard({
 
       {expanded && strategy.actions.length > 0 && (
         <CardContent className="pt-0">
-          {strategy.source === 'AI' && (strategy.params?.available_liquidity as number) > 0 && (
-            <div className="mb-3 flex items-center gap-4 p-2.5 rounded-md bg-gain/5 border border-gain/10 text-sm">
-              <div className="flex items-center gap-1.5 text-gain">
-                <Wallet className="h-3.5 w-3.5" />
-                <span className="font-medium">
-                  Munitions : {formatCurrency(strategy.params.available_liquidity as number, 'EUR', { maximumFractionDigits: 0 })}
-                </span>
-              </div>
-              {(strategy.params?.total_proposed_amount as number) > 0 && (
-                <span className="text-muted-foreground">
-                  Montant proposé : {formatCurrency(strategy.params.total_proposed_amount as number, 'EUR', { maximumFractionDigits: 0 })}
-                  {' '}({(strategy.params.proposed_pct_of_liquidity as number)?.toFixed(1)}% des liquidités)
-                </span>
-              )}
-            </div>
-          )}
-          {strategy.ai_reasoning && strategy.source === 'AI' && (
-            <div className="mb-4 p-3 rounded-md bg-accent/5 border border-accent/10">
-              <p className="text-sm text-muted-foreground italic">{strategy.ai_reasoning}</p>
-            </div>
+          {isLegacy && (
+            <p className="mb-4 text-xs text-muted-foreground">
+              Suggestion générée automatiquement par une version précédente d’InvestAI, conservée pour l’historique.
+              Elle n’est plus mise à jour et ne constitue pas un conseil en investissement.
+            </p>
           )}
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -245,11 +196,11 @@ function StrategyCard({
                     <CircleDot className="h-4 w-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium">{action.action}</span>
+                        <span className="text-sm font-medium">{ACTION_LABELS[action.action] ?? action.action}</span>
                         {action.symbol && (
                           <Badge variant="outline" className="text-xs">{action.symbol}</Badge>
                         )}
-                        {action.amount != null && action.amount > 0 && (
+                        {((action.amount != null && action.amount > 0) || action.status === 'PENDING') && (
                           isEditing ? (
                             <div className="flex items-center gap-1">
                               <Input
@@ -299,17 +250,20 @@ function StrategyCard({
                               onClick={() => {
                                 if (action.status === 'PENDING') {
                                   setEditingId(action.id)
-                                  setEditAmount(String(action.amount))
+                                  setEditAmount(action.amount != null ? String(action.amount) : '')
                                 }
                               }}
                               title={action.status === 'PENDING' ? 'Cliquer pour modifier le montant' : undefined}
                             >
-                              {formatCurrency(action.amount, action.currency)}
+                              {action.amount != null ? formatCurrency(action.amount, action.currency) : 'Saisir le montant'}
                             </button>
                           )
                         )}
                         <Badge variant={actionBadge.variant} className="text-xs">{actionBadge.label}</Badge>
                       </div>
+                      {action.scheduled_at && action.status === 'PENDING' && (
+                        <p className="text-xs text-muted-foreground mt-0.5">Prévue le {formatDate(action.scheduled_at)}</p>
+                      )}
                       {action.reason && (
                         <p className="text-xs text-muted-foreground mt-0.5">{action.reason}</p>
                       )}
@@ -371,13 +325,15 @@ const ACTION_TYPES = [
 ] as const
 
 /**
- * Cycle de vie complet des stratégies IA : proposer (analyse IA), accepter/
- * rejeter, exécuter/sauter les actions, éditer les montants, munitions —
- * et mesurer ce que chaque stratégie a donné (P&L).
+ * Stratégies programmées : l'utilisateur choisit un modèle et ses paramètres
+ * (simulateur), suit les échéances, les marque faites ou ignorées et mesure
+ * le P&L. Plus rien n'est proposé automatiquement ; les anciennes suggestions
+ * restent affichées et archivables.
  */
 export default function StrategiesSection() {
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
+  const [simulatorOpen, setSimulatorOpen] = useState(false)
   const [formName, setFormName] = useState('')
   const [formDesc, setFormDesc] = useState('')
   const [formActions, setFormActions] = useState<FormAction[]>([{ ...EMPTY_ACTION }])
@@ -406,18 +362,6 @@ export default function StrategiesSection() {
     queryFn: strategiesApi.list,
   })
 
-  // AI suggest
-  const suggestMutation = useMutation({
-    mutationFn: strategiesApi.aiSuggest,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.strategies.all })
-      toast({ title: 'Analyse terminée', description: 'Nouvelles stratégies proposées par l\'IA.' })
-    },
-    onError: () => {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de générer des suggestions.' })
-    },
-  })
-
   // Create user strategy
   const createMutation = useMutation({
     mutationFn: strategiesApi.create,
@@ -430,12 +374,6 @@ export default function StrategiesSection() {
     onError: () => {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de créer la stratégie.' })
     },
-  })
-
-  // Accept / Reject
-  const acceptMutation = useMutation({
-    mutationFn: strategiesApi.accept,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.strategies.all }),
   })
 
   const rejectMutation = useMutation({
@@ -482,25 +420,22 @@ export default function StrategiesSection() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Brain className="h-5 w-5 text-primary" />
-            Stratégies IA
+            <CalendarClock className="h-5 w-5 text-primary" />
+            Stratégies programmées
           </h2>
           <p className="text-sm text-muted-foreground">
-            Laissez l'IA analyser votre portefeuille ou créez vos propres stratégies.
+            Choisissez une règle et ses paramètres : le simulateur calcule l'échéancier qui en découle. Simulation,
+            pas un conseil en investissement.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Nouvelle stratégie
+            Stratégie libre
           </Button>
-          <Button onClick={() => suggestMutation.mutate()} disabled={suggestMutation.isPending}>
-            {suggestMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Brain className="h-4 w-4 mr-2" />
-            )}
-            Analyser mon portefeuille
+          <Button onClick={() => setSimulatorOpen(true)}>
+            <Calculator className="h-4 w-4 mr-2" />
+            Simuler une stratégie
           </Button>
         </div>
       </div>
@@ -512,19 +447,21 @@ export default function StrategiesSection() {
         </div>
       )}
 
-      {/* AI Proposals */}
       {proposed.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-base font-semibold flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-accent" />
-            Propositions IA
+            <History className="h-5 w-5 text-muted-foreground" />
+            Anciennes suggestions automatiques
             <Badge variant="secondary">{proposed.length}</Badge>
           </h3>
+          <p className="text-sm text-muted-foreground">
+            Générées par une version précédente, elles ne sont plus mises à jour. Archivez-les ou programmez votre
+            propre règle avec le simulateur.
+          </p>
           {proposed.map((s) => (
             <StrategyCard
               key={s.id}
               strategy={s}
-              onAccept={(id) => acceptMutation.mutate(id)}
               onReject={(id) => rejectMutation.mutate(id)}
               onDelete={(id) => deleteMutation.mutate(id)}
               onMarkAction={(actionId, status) => markActionMutation.mutate({ actionId, status })}
@@ -542,7 +479,6 @@ export default function StrategiesSection() {
             <StrategyCard
               key={s.id}
               strategy={s}
-              onAccept={(id) => acceptMutation.mutate(id)}
               onReject={(id) => rejectMutation.mutate(id)}
               onDelete={(id) => deleteMutation.mutate(id)}
               onMarkAction={(actionId, status) => markActionMutation.mutate({ actionId, status })}
@@ -555,17 +491,13 @@ export default function StrategiesSection() {
       {/* Empty state */}
       {!isLoading && strategies.length === 0 && (
         <EmptyState
-          icon={Brain}
-          title="Aucune stratégie"
-          description={'Cliquez sur "Analyser mon portefeuille" pour que l\'IA propose des stratégies adaptées à votre situation, ou créez les vôtres.'}
+          icon={CalendarClock}
+          title="Aucune stratégie programmée"
+          description="Choisissez un modèle (achat périodique, VCA, paliers de prise de profits, rééquilibrage), fixez vos paramètres et visualisez l'échéancier avant de l'enregistrer."
           action={
-            <Button onClick={() => suggestMutation.mutate()} disabled={suggestMutation.isPending}>
-              {suggestMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Brain className="h-4 w-4 mr-2" />
-              )}
-              Analyser mon portefeuille
+            <Button onClick={() => setSimulatorOpen(true)}>
+              <Calculator className="h-4 w-4 mr-2" />
+              Simuler une stratégie
             </Button>
           }
         />
@@ -579,7 +511,6 @@ export default function StrategiesSection() {
             <StrategyCard
               key={s.id}
               strategy={s}
-              onAccept={(id) => acceptMutation.mutate(id)}
               onReject={(id) => rejectMutation.mutate(id)}
               onDelete={(id) => deleteMutation.mutate(id)}
               onMarkAction={(actionId, status) => markActionMutation.mutate({ actionId, status })}
@@ -589,11 +520,13 @@ export default function StrategiesSection() {
         </div>
       )}
 
+      <StrategySimulator open={simulatorOpen} onOpenChange={setSimulatorOpen} />
+
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetForm() }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Nouvelle stratégie</DialogTitle>
+            <DialogTitle>Stratégie libre</DialogTitle>
           </DialogHeader>
           <div className="space-y-5 py-4">
             {/* Name */}

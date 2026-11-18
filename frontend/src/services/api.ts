@@ -513,7 +513,7 @@ export const predictionsApi = {
     return response.data
   },
 
-  validateSignal: async (params?: { symbol?: string; action?: string }) => {
+  validateSignal: async (params: { symbol?: string; amount_eur: number }) => {
     const response = await api.get('/predictions/validate-signal', {
       params,
       timeout: ANALYTICS_TIMEOUT,

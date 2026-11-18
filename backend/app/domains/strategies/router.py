@@ -9,6 +9,8 @@ from app.core.db.session import get_session
 from app.core.rate_limit import limiter
 from app.domains.identity.dependencies import CurrentUser
 from app.domains.identity.models import User
+from app.domains.strategies.backtest import run_backtest
+from app.domains.strategies.disclaimer import SIMULATION_DISCLAIMER
 from app.domains.strategies.models import ActionStatus, Strategy, StrategyAction, StrategySource, StrategyStatus
 from app.domains.strategies.repository import (
     find_owned_action,
@@ -16,9 +18,23 @@ from app.domains.strategies.repository import (
     list_actions,
     list_user_strategies,
 )
-from app.domains.strategies.schemas import StrategyActionUpdate, StrategyCreate, StrategyResponse, StrategyUpdate
+from app.domains.strategies.schemas import (
+    SimulationRequest,
+    SimulationResponse,
+    StrategyActionUpdate,
+    StrategyCreate,
+    StrategyResponse,
+    StrategyUpdate,
+    TemplateStrategyCreate,
+)
 from app.domains.strategies.service import strategy_service
-from app.domains.strategies.suggestions import ai_strategy_service
+from app.domains.strategies.templates import (
+    actions_from_schedule,
+    build_schedule,
+    describe_rule,
+    parse_template_params,
+    schedule_totals,
+)
 
 router = APIRouter()
 
@@ -43,6 +59,11 @@ def _action_payload(a: StrategyAction) -> dict[str, Any]:
     }
 
 
+def _rule_summary(params: dict[str, Any] | None) -> str | None:
+    template = parse_template_params(params)
+    return describe_rule(template) if template else None
+
+
 async def _enrich(db: AsyncSession, strategy: Strategy) -> dict[str, Any]:
     actions = await list_actions(db, strategy.id)
     return {
@@ -53,6 +74,7 @@ async def _enrich(db: AsyncSession, strategy: Strategy) -> dict[str, Any]:
         "source": strategy.source.value if strategy.source else "USER",
         "status": strategy.status.value if strategy.status else "ACTIVE",
         "params": strategy.params or {},
+        "rule_summary": _rule_summary(strategy.params),
         "ai_reasoning": strategy.ai_reasoning,
         "market_regime": strategy.market_regime,
         "confidence": float(strategy.confidence) if strategy.confidence else None,
@@ -141,24 +163,76 @@ async def update_strategy(
 @router.delete("/{strategy_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("10/minute")
 async def delete_strategy(request: Request, strategy_id: UUID, user: CurrentUser, session: Session) -> None:
-    """Supprime la stratégie et ses actions ; une stratégie générée par l'IA est refusée (403)."""
+    """Supprime la stratégie et ses actions ; une stratégie héritée de l'ancienne génération automatique est
+    refusée (403) : on la rejette pour l'archiver."""
     strategy = await _owned_or_404(session, strategy_id, user)
 
     if strategy.source == StrategySource.AI:
-        raise HTTPException(status_code=403, detail="Les stratégies générées par l'IA ne peuvent pas être supprimées")
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Les stratégies générées automatiquement par l'ancienne version ne peuvent pas être "
+                "supprimées : rejetez-les pour les archiver"
+            ),
+        )
 
     await session.delete(strategy)
     await session.commit()
 
 
-@router.post("/ai-suggest", response_model=list[StrategyResponse])
+@router.post("/simulate", response_model=SimulationResponse)
+@limiter.limit("20/minute")
+async def simulate_strategy(
+    request: Request, data: SimulationRequest, user: CurrentUser, session: Session
+) -> SimulationResponse:
+    """Aperçu d'un modèle paramétré, sans rien enregistrer : échéancier et montants qui découlent des seuls
+    paramètres saisis, et, si ``backtest_start`` est fourni, la règle rejouée sur l'historique de prix."""
+    schedule = build_schedule(data.params)
+    total_buy, total_sell, deferred = schedule_totals(schedule)
+    backtest = await run_backtest(session, data.params, data.backtest_start) if data.backtest_start else None
+    return SimulationResponse(
+        template=data.params.template,
+        rule_summary=describe_rule(data.params),
+        schedule=schedule,
+        total_buy_eur=total_buy,
+        total_sell_eur=total_sell,
+        has_amounts_at_execution=deferred,
+        backtest=backtest,
+        disclaimer=SIMULATION_DISCLAIMER,
+    )
+
+
+@router.post("/from-template", response_model=StrategyResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
+async def create_strategy_from_template(
+    request: Request, data: TemplateStrategyCreate, user: CurrentUser, session: Session
+) -> dict[str, Any]:
+    """Enregistre la règle paramétrée (source USER, ACTIVE) avec une action PENDING par achat ou vente de son
+    échéancier, datée de son échéance."""
+    strategy = Strategy(
+        user_id=user.id,
+        name=data.name,
+        description=data.description,
+        source=StrategySource.USER,
+        status=StrategyStatus.ACTIVE,
+        params=data.params.model_dump(mode="json"),
+    )
+    session.add(strategy)
+    await session.flush()
+    for planned in actions_from_schedule(build_schedule(data.params)):
+        session.add(StrategyAction(strategy_id=strategy.id, status=ActionStatus.PENDING, **planned))
+    await session.commit()
+    await session.refresh(strategy)
+    return await _enrich(session, strategy)
+
+
+@router.post("/ai-suggest", response_model=list[StrategyResponse], deprecated=True)
 @limiter.limit("5/minute")
 async def ai_suggest_strategies(request: Request, user: CurrentUser, session: Session) -> list[dict[str, Any]]:
-    """Propositions IA (régime de marché, composition, scores alpha, liquidité), enregistrées en PROPOSED."""
-    suggestions = await ai_strategy_service.suggest_strategies(session, str(user.id))
-    saved = await ai_strategy_service.save_suggestions(session, str(user.id), suggestions)
-
-    return [await _enrich(session, s) for s in saved]
+    """Retiré : InvestAI ne génère plus de stratégies à partir des signaux, des positions ou de la liquidité.
+    Répond une liste vide, sans toucher aux propositions déjà enregistrées ; utiliser ``/simulate`` et
+    ``/from-template``."""
+    return []
 
 
 @router.patch("/{strategy_id}/accept", response_model=StrategyResponse)

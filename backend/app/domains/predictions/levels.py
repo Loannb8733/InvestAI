@@ -110,35 +110,53 @@ def _skill_from_mape(models_detail: list[dict[str, Any]]) -> float:
     return float(np.clip(100.0 - avg_mape * 4, 15, 95))
 
 
-def _direction_votes(models_detail: list[dict[str, Any]], ensemble_trend: str) -> tuple[float, int]:
-    compatible = 0.0
-    opposing = 0
-    for t in [m.get("trend", "neutral") for m in models_detail]:
-        if t == ensemble_trend:
-            compatible += 1
-        elif t == "neutral":
-            compatible += 0.5
-        else:
-            opposing += 1
-    return compatible, opposing
+MIN_MEASURED_SAMPLES = 10
+SIGNIFICANCE_MIN_SAMPLES = 15
+ONE_SIDED_Z_5PCT = 1.645
 
 
-def reliability_from_ensemble(
-    models_detail: list[dict[str, Any]], ensemble_trend: str
-) -> tuple[float, float, int, bool]:
-    """(score de compétence, taux de réussite estimé, nombre de modèles, significatif) sans backtest : la compétence
-    vaut 100 - 4 * MAPE pondéré (bornée 15-95), le taux suit l'accord des modèles sur la direction (30-85, un modèle
-    neutre compte pour moitié), significatif dès quatre modèles avec au plus un opposé."""
+def skill_from_ensemble(models_detail: list[dict[str, Any]]) -> float:
+    """Score de compétence de l'ensemble : 100 - 4 * MAPE pondéré des fenêtres de backtest internes (borné 15-95),
+    50 sans détail de modèle."""
     if not models_detail:
-        return 50.0, 50.0, 0, False
+        return 50.0
+    return round(_skill_from_mape(models_detail), 1)
 
-    n_models = len(models_detail)
-    skill_score = _skill_from_mape(models_detail)
-    compatible, opposing = _direction_votes(models_detail, ensemble_trend)
-    consensus_ratio = compatible / max(n_models, 1)
-    hit_rate = float(np.clip(30 + consensus_ratio * 65, 30, 85))
-    significant = n_models >= 4 and opposing <= 1
-    return round(skill_score, 1), round(hit_rate, 1), n_models, significant
+
+def measured_reliability(n_checked: int, n_correct: int, avg_mape: float | None) -> dict[str, Any]:
+    """Fiabilité mesurée sur les prévisions passées vérifiées contre le cours réel (``prediction_logs``).
+
+    Sous ``MIN_MEASURED_SAMPLES`` prévisions vérifiées, rien n'est affiché comme fiabilité : l'historique est
+    insuffisant. Le taux de direction juste n'est dit significatif qu'à partir de ``SIGNIFICANCE_MIN_SAMPLES``
+    vérifications, par un test binomial unilatéral à 5 % contre le hasard (50 %)."""
+    if n_checked < MIN_MEASURED_SAMPLES:
+        return {
+            "hit_rate": None,
+            "hit_rate_n_samples": n_checked,
+            "hit_rate_significant": False,
+            "measured_mape": None,
+            "reliability_score": None,
+            "model_confidence": "insufficient_history",
+        }
+    hit_rate = n_correct / n_checked * 100
+    significant = False
+    if n_checked >= SIGNIFICANCE_MIN_SAMPLES:
+        z = (n_correct - n_checked * 0.5) / math.sqrt(n_checked * 0.25)
+        significant = z > ONE_SIDED_Z_5PCT
+    if significant:
+        confidence = "useful"
+    elif hit_rate >= 50:
+        confidence = "uncertain"
+    else:
+        confidence = "unreliable"
+    return {
+        "hit_rate": round(hit_rate, 1),
+        "hit_rate_n_samples": n_checked,
+        "hit_rate_significant": significant,
+        "measured_mape": round(avg_mape, 2) if avg_mape is not None else None,
+        "reliability_score": round(hit_rate, 1),
+        "model_confidence": confidence,
+    }
 
 
 def _avg_autocorrelation(returns: FloatArray, mean_r: float, var_r: float) -> float:

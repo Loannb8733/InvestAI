@@ -1,7 +1,7 @@
 {
   "body": {
-    "reason": "Aucun actif scoré disponible.",
-    "validated": false
+    "found": false,
+    "reason": "Aucun actif scoré disponible."
   },
   "status": 200
 }
