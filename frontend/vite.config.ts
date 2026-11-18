@@ -127,6 +127,7 @@ export default defineConfig({
     css: true,
     env: {
       NODE_ENV: 'test',
+      TZ: 'UTC',
     },
   },
 })

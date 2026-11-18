@@ -1,0 +1,26 @@
+{
+  "writes": [
+    {
+      "method": "POST",
+      "url": "/transactions/import-csv",
+      "params": {
+        "portfolio_id": "p1"
+      },
+      "body": {
+        "file": "binance.csv"
+      }
+    }
+  ],
+  "reads": [
+    "/portfolios",
+    "/transactions",
+    "/transactions"
+  ],
+  "toasts": [
+    {
+      "title": "Import réussi",
+      "description": "3 transactions importées avec succès."
+    }
+  ],
+  "open": false
+}

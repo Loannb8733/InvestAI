@@ -1,0 +1,32 @@
+{
+  "text": [
+    "Importer des transactions",
+    "Importez vos transactions depuis un fichier CSV",
+    "Portefeuille de destination",
+    "Sélectionnez un portefeuille",
+    "Veuillez sélectionner un portefeuille",
+    "Plateforme source",
+    "Auto-détection",
+    "Le format sera détecté automatiquement, ou sélectionnez manuellement.",
+    "Destination des transferts sortants",
+    "Wallet froid par défaut (Tangem)",
+    "Nouvelle",
+    "Chaque transfert sortant crée le transfert entrant correspondant sur cette plateforme, ou sur le wallet froid par défaut (Tangem) si aucune n'est choisie.",
+    "Plateformes supportées :",
+    "Crypto.com",
+    "- Export depuis l'app (Paramètres → Exporter)",
+    "Binance",
+    "- Historique des transactions",
+    "Kraken",
+    "- Export des ledgers",
+    "Générique",
+    "- Format InvestAI (symbol, type, quantity, price, date)",
+    "Les actifs sont créés automatiquement s'ils n'existent pas.",
+    "Télécharger un modèle générique",
+    "binance.csv",
+    "Importer dans",
+    "le portefeuille",
+    "Fermer"
+  ],
+  "disabled": true
+}

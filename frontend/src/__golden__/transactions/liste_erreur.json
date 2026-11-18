@@ -1,0 +1,34 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/transactions",
+      "params": {
+        "skip": 0,
+        "limit": 200,
+        "include_total": true
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    }
+  ],
+  "text": [
+    "Impossible de charger les transactions",
+    "La requête a échoué : Request failed with status code 500",
+    "Réessayer"
+  ]
+}

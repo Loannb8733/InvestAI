@@ -1,0 +1,36 @@
+{
+  "writes": [
+    {
+      "method": "POST",
+      "url": "/assets",
+      "body": {
+        "portfolio_id": "p1",
+        "symbol": "USD",
+        "name": "USD",
+        "asset_type": "fiat",
+        "exchange": "Kraken"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur de validation",
+      "description": "Données invalides. Vérifiez les champs.",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": [
+        {
+          "type": "enum",
+          "loc": [
+            "body",
+            "asset_type"
+          ],
+          "msg": "Input should be crypto, stock, etf, real_estate, bond, crowdfunding or other"
+        }
+      ]
+    }
+  ]
+}

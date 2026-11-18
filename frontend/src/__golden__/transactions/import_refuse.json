@@ -1,0 +1,14 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur 400",
+      "description": "Format de fichier non reconnu",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur d'import",
+      "description": "[400] Format de fichier non reconnu"
+    }
+  ]
+}

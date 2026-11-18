@@ -1,0 +1,27 @@
+{
+  "dialog": [
+    "Supprimer toutes les transactions ?",
+    "Cette action est irréversible.",
+    "Toutes vos transactions (23) seront",
+    "définitivement supprimées et les quantités des actifs concernés seront remises à zéro.",
+    "Annuler",
+    "Supprimer tout"
+  ],
+  "writes": [
+    {
+      "method": "DELETE",
+      "url": "/transactions/all"
+    }
+  ],
+  "reads": [
+    "/portfolios",
+    "/transactions",
+    "/portfolios",
+    "/transactions"
+  ],
+  "toasts": [
+    {
+      "title": "23 transactions supprimées"
+    }
+  ]
+}

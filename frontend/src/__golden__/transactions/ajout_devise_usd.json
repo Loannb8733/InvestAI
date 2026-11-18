@@ -1,0 +1,21 @@
+{
+  "label": [
+    "Frais (",
+    "USD",
+    ")"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "url": "/transactions",
+      "body": {
+        "asset_id": "a1",
+        "transaction_type": "buy",
+        "quantity": 0.02,
+        "price": 50000,
+        "fee": 2,
+        "exchange": "Binance"
+      }
+    }
+  ]
+}

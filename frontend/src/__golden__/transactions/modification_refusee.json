@@ -1,0 +1,15 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Impossible de mettre à jour la transaction"
+    }
+  ],
+  "open": true
+}

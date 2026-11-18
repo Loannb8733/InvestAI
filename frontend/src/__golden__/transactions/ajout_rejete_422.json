@@ -1,0 +1,14 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur de validation",
+      "description": "Données invalides. Vérifiez les champs.",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Input should be greater than 0"
+    }
+  ]
+}

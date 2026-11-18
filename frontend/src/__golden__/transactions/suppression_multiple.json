@@ -1,0 +1,38 @@
+{
+  "dialog": [
+    "Supprimer",
+    "3",
+    "transaction",
+    "s",
+    "?",
+    "Cette action est irréversible. Les transactions sélectionnées seront définitivement supprimées.",
+    "Annuler",
+    "Supprimer"
+  ],
+  "writes": [
+    {
+      "method": "DELETE",
+      "url": "/transactions/dca16"
+    },
+    {
+      "method": "DELETE",
+      "url": "/transactions/dca15"
+    },
+    {
+      "method": "DELETE",
+      "url": "/transactions/t5"
+    }
+  ],
+  "reads": [
+    "/portfolios",
+    "/transactions",
+    "/portfolios",
+    "/transactions"
+  ],
+  "toasts": [
+    {
+      "title": "2 supprimées, 1 erreurs",
+      "variant": "destructive"
+    }
+  ]
+}
