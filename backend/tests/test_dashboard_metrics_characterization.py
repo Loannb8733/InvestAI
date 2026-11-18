@@ -50,6 +50,7 @@ def _metriques(actifs, cash_stable=0.0, cash_fiat=0.0):
         "assets": actifs,
         "cash_from_stablecoins": cash_stable,
         "cash_from_fiat": cash_fiat,
+        "cash_from_balances": 0.0,
     }
 
 
