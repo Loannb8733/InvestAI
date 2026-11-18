@@ -1,7 +1,8 @@
 import { Download, Plus, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
-import { transactionsApi } from '@/services/api'
+import { saveFile } from '@/features/transactions/format'
+import { fetchTransactionsCsv } from '@/features/transactions/hooks'
 
 interface PortfolioHeaderProps {
   portfolioId: string | null
@@ -14,13 +15,7 @@ export default function PortfolioHeader({ portfolioId, onImport, onAddPortfolio 
 
   const exportCsv = async () => {
     try {
-      const blob = await transactionsApi.exportCSV(portfolioId || undefined)
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'transactions_export.csv'
-      a.click()
-      window.URL.revokeObjectURL(url)
+      saveFile(await fetchTransactionsCsv(portfolioId || undefined), 'transactions_export.csv')
       toast({ title: 'Export réussi', description: 'Le fichier CSV a été téléchargé.' })
     } catch {
       toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'exporter les transactions." })

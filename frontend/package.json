@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
-    "api:schema": "openapi-typescript src/shared/api/openapi.json -o src/shared/api/schema.d.ts"
+    "api:schema": "openapi-typescript src/shared/api/openapi.json -o src/shared/api/schema.d.ts --default-non-nullable false"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.2",

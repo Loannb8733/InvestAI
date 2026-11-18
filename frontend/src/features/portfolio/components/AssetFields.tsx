@@ -1,7 +1,7 @@
 import type { FieldErrors, UseFormRegister } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { PlatformSelect } from '@/components/forms/PlatformSelect'
+import PlatformSelect from '@/features/transactions/components/PlatformSelect'
 import type { AssetFormInput } from '../assetForm'
 
 interface AssetFieldsProps {

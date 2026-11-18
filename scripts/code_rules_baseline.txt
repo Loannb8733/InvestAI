@@ -26,10 +26,6 @@ comments	frontend/src/components/exchanges/TestResultDialog.tsx
 comments	frontend/src/components/exchanges/exchange-guides.ts
 comments	frontend/src/components/exchanges/exchange-logo.tsx
 comments	frontend/src/components/exchanges/format-balance.ts
-comments	frontend/src/components/forms/AddTransactionForm.tsx
-comments	frontend/src/components/forms/EditTransactionForm.tsx
-comments	frontend/src/components/forms/ImportCSVForm.tsx
-comments	frontend/src/components/forms/PlatformSelect.tsx
 comments	frontend/src/components/intelligence/DecisionsPillar.tsx
 comments	frontend/src/components/intelligence/MarketSignalsPillar.tsx
 comments	frontend/src/components/intelligence/RegimeHeader.tsx
@@ -110,10 +106,8 @@ comments	frontend/src/pages/IntelligencePage.tsx
 comments	frontend/src/pages/MasterDashboardPage.tsx
 comments	frontend/src/pages/ReportsPage.tsx
 comments	frontend/src/pages/SimulationsPage.tsx
-comments	frontend/src/pages/TransactionsPage.tsx
 comments	frontend/src/pages/crowdfunding-projets.ts
 comments	frontend/src/pages/intelligenceTabs.ts
-comments	frontend/src/pages/transactions-format.ts
 comments	frontend/src/services/api.ts
 comments	frontend/src/setupTests.ts
 comments	frontend/src/types/crowdfunding.ts
@@ -126,9 +120,6 @@ too-long	backend/app/core/redis_client.py
 too-long	frontend/src/components/crowdfunding/PaymentTimeline.tsx
 too-long	frontend/src/components/dashboard/IASummaryWidget.tsx
 too-long	frontend/src/components/exchanges/exchange-guides.ts
-too-long	frontend/src/components/forms/AddTransactionForm.tsx
-too-long	frontend/src/components/forms/EditTransactionForm.tsx
-too-long	frontend/src/components/forms/ImportCSVForm.tsx
 too-long	frontend/src/components/intelligence/RiskPerformancePillar.tsx
 too-long	frontend/src/components/intelligence/decisions/StrategiesSection.tsx
 too-long	frontend/src/components/intelligence/market/AlphaSignalsSection.tsx
@@ -154,6 +145,5 @@ too-long	frontend/src/pages/GoalsPage.tsx
 too-long	frontend/src/pages/MasterDashboardPage.tsx
 too-long	frontend/src/pages/ReportsPage.tsx
 too-long	frontend/src/pages/SimulationsPage.tsx
-too-long	frontend/src/pages/TransactionsPage.tsx
 too-long	frontend/src/services/api.ts
 too-long	frontend/src/types/crowdfunding.ts
