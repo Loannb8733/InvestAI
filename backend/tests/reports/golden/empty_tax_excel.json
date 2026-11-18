@@ -2,17 +2,20 @@
   "body": {
     "Cessions": [
       [
-        "Date",
+        "Date (l. 211)",
         "Actif",
-        "Type",
         "Quantité",
         "Prix unitaire",
-        "Prix cession",
-        "Valeur portefeuille",
-        "Coût acquisition",
-        "Fraction acq.",
+        "Valeur globale du portefeuille (l. 212)",
+        "Prix de cession (l. 213/217)",
+        "Frais (l. 214)",
+        "Prix net de frais (l. 218)",
+        "Prix total d'acquisition (l. 220)",
+        "Fractions antérieures (l. 221)",
+        "Prix total d'acquisition net (l. 223)",
+        "Fraction de capital initial",
         "PV/MV",
-        "Durée"
+        "Durée (indicative)"
       ]
     ],
     "Résumé 2026": [
@@ -41,11 +44,11 @@
         0
       ],
       [
-        "Prix total de cession",
+        "Total des prix de cession nets de frais (ligne 51)",
         0
       ],
       [
-        "Fraction d'acquisition (PMP)",
+        "Fractions de capital initial cédées",
         0
       ],
       [
@@ -57,23 +60,31 @@
         0
       ],
       [
+        "Plus-value nette (ligne 52)",
+        0
+      ],
+      [
+        "Exonération (total ≤ 305 €)",
+        "non"
+      ],
+      [
         "Plus-value nette imposable",
         0
       ],
       [
-        "Estimation fiscale (PFU 30%)",
+        "Estimation fiscale (PFU 31,4 %, revenus 2026)",
         null
       ],
       [
-        "Impôt sur le revenu (12,8%)",
+        "Impôt sur le revenu (12,8 %)",
         0
       ],
       [
-        "Prélèvements sociaux (17,2%)",
+        "Prélèvements sociaux (18,6 %)",
         0
       ],
       [
-        "Total Flat Tax (30%)",
+        "Total PFU (31,4 %)",
         0
       ]
     ]

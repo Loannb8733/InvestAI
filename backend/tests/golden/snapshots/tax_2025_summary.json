@@ -1,13 +1,22 @@
 {
   "body": {
+    "exempt": false,
+    "exemption_threshold": 305.0,
     "flat_tax_30": 0.0,
     "ir_12_8": 0.0,
     "nb_cessions": 2,
-    "net_plus_value": -1823.85,
+    "net_plus_value": -11.3,
+    "pfu_ir": 0.0,
+    "pfu_ir_rate": 0.128,
+    "pfu_ps": 0.0,
+    "pfu_ps_rate": 0.186,
+    "pfu_rate": 0.314,
+    "pfu_total": 0.0,
     "ps_17_2": 0.0,
+    "taxable_plus_value": 0.0,
     "total_cessions": 3355.0,
-    "total_moins_values": -1823.85,
-    "total_plus_values": 0,
+    "total_moins_values": -602.8,
+    "total_plus_values": 591.5,
     "year": 2025
   },
   "status": 200

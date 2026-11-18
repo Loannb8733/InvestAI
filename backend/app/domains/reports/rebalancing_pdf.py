@@ -1,4 +1,5 @@
 import io
+from decimal import Decimal
 from typing import Any, NamedTuple
 
 from reportlab.lib import colors
@@ -20,11 +21,12 @@ from app.domains.reports.styles import (
     money,
     pct,
 )
+from app.domains.reports.tax_rates import percent
 
 _HHI_LEGEND = "HHI &lt; 1500 = bien diversifié | 1500-2500 = modéré | &gt; 2500 = concentré"
 _DISCLAIMER = (
     "Ce rapport est fourni à titre indicatif. L'estimation fiscale utilise "
-    "les couches FIFO actuelles et le PFU à 30%. Consultez un professionnel "
+    "les couches FIFO actuelles et le PFU de l'année ({rate}). Consultez un professionnel "
     "avant d'exécuter les ordres suggérés."
 )
 _KEY_VALUE_STYLE: list[tuple[Any, ...]] = [
@@ -103,8 +105,12 @@ def _allocation_section(categories: list[dict[str, Any]], st: _Styles) -> list[F
     return [Paragraph("2. Allocation Actuelle vs Cible", st.heading), t, Spacer(1, 20)]
 
 
-def _orders_table(orders: list[RebalanceOrder]) -> Table:
-    rows = [["Action", "Catégorie", "Montant", "PV Latente", "Impôt (PFU 30%)"]]
+def _rate(report: RebalancingReport) -> str:
+    return percent(Decimal(str(report.pfu_rate)))
+
+
+def _orders_table(orders: list[RebalanceOrder], rate: str) -> Table:
+    rows = [["Action", "Catégorie", "Montant", "PV Latente", f"Impôt (PFU {rate})"]]
     for o in orders:
         is_sell = o.action == "sell"
         rows.append(
@@ -139,7 +145,7 @@ def _tax_impact_table(report: RebalancingReport) -> Table:
         ["Total ventes", money(report.total_sell_amount)],
         ["Total achats", money(report.total_buy_amount)],
         ["Plus-value latente estimée", money(report.total_estimated_gain)],
-        ["Impôt estimé (PFU 30%)", money(report.total_estimated_tax)],
+        [f"Impôt estimé (PFU {_rate(report)})", money(report.total_estimated_tax)],
     ]
     t = Table(rows, colWidths=[8 * cm, 5 * cm])
     t.setStyle(
@@ -159,7 +165,7 @@ def _orders_section(report: RebalancingReport, st: _Styles) -> list[Flowable]:
         return []
     return [
         Paragraph("3. Ordres de Rééquilibrage Suggérés", st.heading),
-        _orders_table(report.orders),
+        _orders_table(report.orders, _rate(report)),
         Spacer(1, 15),
         Paragraph("4. Impact Fiscal du Rééquilibrage", st.heading),
         _tax_impact_table(report),
@@ -197,7 +203,7 @@ def render_rebalancing_pdf(report: RebalancingReport) -> bytes:
     elements += _allocation_section(report.categories, st)
     elements += _orders_section(report, st)
     elements += _concentration_section(report, st)
-    elements.append(Paragraph(_DISCLAIMER, st.info))
+    elements.append(Paragraph(_DISCLAIMER.format(rate=_rate(report)), st.info))
     doc.build(elements)
     buffer.seek(0)
     return buffer.getvalue()

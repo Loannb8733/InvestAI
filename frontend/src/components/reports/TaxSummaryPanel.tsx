@@ -21,18 +21,32 @@ import { formatCurrency } from '@/lib/utils'
  * par an au moment du PDF.
  *
  * Affiche pour l'année choisie : cessions imposables, PV/MV, PV nette et la
- * décomposition du PFU (IR 12,8 % + PS 17,2 %) — la vraie base (méthode
- * d'acquisition globale, cessions crypto→fiat uniquement). Rappelle la règle
- * française : les moins-values crypto ne se reportent PAS d'une année sur
- * l'autre (art. 150 VH bis).
+ * décomposition du PFU au taux de l'année renvoyé par l'API (31,4 % = IR
+ * 12,8 % + PS 18,6 % dès les revenus 2025, 30 % avant) — la vraie base (méthode
+ * du portefeuille, cessions crypto→fiat uniquement, échanges crypto→crypto en
+ * sursis, exonération si les cessions de l'année n'excèdent pas 305 €).
+ * Rappelle la règle française : les moins-values crypto ne se reportent PAS
+ * d'une année sur l'autre (art. 150 VH bis).
  */
 
 const CURRENT_YEAR = new Date().getFullYear()
 
+type TaxSummaryWithRates = TaxSummary & {
+  pfu_rate?: number
+  pfu_total?: number
+  pfu_ir?: number
+  pfu_ps?: number
+  exempt?: boolean
+  exemption_threshold?: number
+}
+
+const formatRate = (rate: number) =>
+  `${(rate * 100).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`
+
 export default function TaxSummaryPanel() {
   const [year, setYear] = useState(CURRENT_YEAR)
 
-  const { data, isLoading } = useQuery<TaxSummary>({
+  const { data, isLoading } = useQuery<TaxSummaryWithRates>({
     queryKey: queryKeys.reports.taxSummary(year),
     queryFn: () => reportsApi.getTaxSummary(year),
     staleTime: 10 * 60_000,
@@ -111,10 +125,14 @@ export default function TaxSummaryPanel() {
                 format={formatCurrency}
                 delta={data.net_plus_value > 0 ? undefined : undefined}
                 hint={
-                  data.net_plus_value > 0 ? (
+                  data.exempt ? (
+                    <>Exonéré : cessions de l'année ≤ {formatCurrency(data.exemption_threshold ?? 305)}</>
+                  ) : data.net_plus_value > 0 ? (
                     <>
-                      PFU 30 % : <strong>{formatCurrency(data.flat_tax_30)}</strong> (IR{' '}
-                      {formatCurrency(data.ir_12_8)} + PS {formatCurrency(data.ps_17_2)})
+                      PFU {formatRate(data.pfu_rate ?? 0.3)} :{' '}
+                      <strong>{formatCurrency(data.pfu_total ?? data.flat_tax_30)}</strong> (IR{' '}
+                      {formatCurrency(data.pfu_ir ?? data.ir_12_8)} + PS{' '}
+                      {formatCurrency(data.pfu_ps ?? data.ps_17_2)})
                     </>
                   ) : (
                     <>Aucun impôt dû sur {year}</>

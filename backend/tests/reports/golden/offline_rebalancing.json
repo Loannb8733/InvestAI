@@ -67,7 +67,7 @@
         "current_pct": 86.71,
         "drift_pct": 36.71,
         "estimated_gain": 3067.25,
-        "estimated_tax": 920.18,
+        "estimated_tax": 963.12,
         "target_pct": 50.0
       },
       {
@@ -101,9 +101,10 @@
         "target_pct": 20.0
       }
     ],
+    "pfu_rate": 0.314,
     "total_buy_amount": 15037.5,
     "total_estimated_gain": 3067.25,
-    "total_estimated_tax": 920.18,
+    "total_estimated_tax": 963.12,
     "total_sell_amount": 15037.5,
     "total_value": 42522.0
   },

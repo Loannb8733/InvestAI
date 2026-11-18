@@ -48,7 +48,7 @@
       "Catégorie",
       "Montant",
       "PV Latente",
-      "Impôt (PFU 30%)",
+      "Impôt (PFU 31,4 %)",
       "ACHETER",
       "DeFi",
       "4,344.00 €",
@@ -58,7 +58,7 @@
       "Layer 1",
       "24,780.00 €",
       "12,121.74 €",
-      "3,636.52 €",
+      "3,806.23 €",
       "ACHETER",
       "Layer 2",
       "5,344.00 €",
@@ -81,8 +81,8 @@
       "24,780.00 €",
       "Plus-value latente estimée",
       "12,121.74 €",
-      "Impôt estimé (PFU 30%)",
-      "3,636.52 €"
+      "Impôt estimé (PFU 31,4 %)",
+      "3,806.23 €"
     ],
     [
       "Page 2",
@@ -92,8 +92,8 @@
       "HHI après rééquilibrage",
       "3200",
       "HHI < 1500 = bien diversifié | 1500-2500 = modéré | > 2500 = concentré",
-      "Ce rapport est fourni à titre indicatif. L'estimation fiscale utilise les couches FIFO actuelles et le PFU à 30%. Consultez",
-      "un professionnel avant d'exécuter les ordres suggérés."
+      "Ce rapport est fourni à titre indicatif. L'estimation fiscale utilise les couches FIFO actuelles et le PFU de l'année (31,4",
+      "%). Consultez un professionnel avant d'exécuter les ordres suggérés."
     ]
   ],
   "headers": {
