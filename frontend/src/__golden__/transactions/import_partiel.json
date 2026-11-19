@@ -15,7 +15,7 @@
   "toasts": [
     {
       "title": "Import partiel",
-      "description": "2 transactions importées, 1 erreurs. 4 déjà présentes, ignorées."
+      "description": "2 transactions importées, 1 erreur. 4 déjà présentes, ignorées."
     }
   ],
   "text": [
@@ -31,23 +31,19 @@
     "Nouvelle",
     "Chaque transfert sortant crée le transfert entrant correspondant sur cette plateforme, ou sur le wallet froid par défaut (Tangem) si aucune n'est choisie.",
     "Plateformes supportées :",
-    "Crypto.com",
-    "- Export depuis l'app (Paramètres → Exporter)",
     "Binance",
     "- Historique des transactions",
     "Kraken",
     "- Export des ledgers",
-    "Générique",
-    "- Format InvestAI (symbol, type, quantity, price, date)",
+    "Crypto.com",
+    "- Export depuis l'app (Paramètres → Exporter)",
+    "OKX",
     "Les actifs sont créés automatiquement s'ils n'existent pas.",
     "Télécharger un modèle générique",
     "binance.csv",
-    "2",
-    "importées",
-    "1",
-    "erreurs",
-    "4",
-    "déjà présentes",
+    "2 importées",
+    "1 erreur",
+    "4 déjà présentes",
     "Erreurs :",
     "Ligne 3 : symbole manquant",
     "Importer dans",

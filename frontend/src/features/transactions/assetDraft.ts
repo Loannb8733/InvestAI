@@ -20,13 +20,12 @@ export const EMPTY_ASSET_DRAFT: AssetDraft = {
   maturity: '',
 }
 
-export const ASSET_TYPES = [
+export const ASSET_TYPES: { value: AssetCreate['asset_type']; label: string }[] = [
   { value: 'crypto', label: 'Crypto' },
   { value: 'stock', label: 'Action' },
   { value: 'etf', label: 'ETF' },
   { value: 'real_estate', label: 'Immobilier' },
   { value: 'bond', label: 'Obligation' },
-  { value: 'fiat', label: 'Fiat' },
 ]
 
 export const isRealEstate = (draft: AssetDraft) => draft.type === 'real_estate'
@@ -38,7 +37,8 @@ export const canCreateAsset = (draft: AssetDraft) => isIdentified(draft) && !!dr
 
 export function assetBody(draft: AssetDraft, portfolioId: string): AssetCreate | null {
   const realEstate = isRealEstate(draft)
-  if (!isIdentified(draft) || !portfolioId) return null
+  const assetType = ASSET_TYPES.find((t) => t.value === draft.type)?.value
+  if (!assetType || !isIdentified(draft) || !portfolioId) return null
   const symbol = realEstate
     ? draft.name.trim().substring(0, 18).toUpperCase().replace(/\s+/g, '-')
     : draft.symbol.trim().toUpperCase()
@@ -47,7 +47,7 @@ export function assetBody(draft: AssetDraft, portfolioId: string): AssetCreate |
     portfolio_id: portfolioId,
     symbol,
     name: draft.name.trim() || symbol,
-    asset_type: draft.type as AssetCreate['asset_type'],
+    asset_type: assetType,
     ...(draft.exchange ? { exchange: draft.exchange } : {}),
     ...(realEstate
       ? {

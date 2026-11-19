@@ -1,11 +1,6 @@
 {
   "toasts": [
     {
-      "title": "Erreur serveur",
-      "description": "boom",
-      "variant": "destructive"
-    },
-    {
       "title": "Erreur lors de la suppression",
       "variant": "destructive"
     }

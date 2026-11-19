@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useToast } from '@/hooks/use-toast'
-import { generateCSV, saveFile, today } from './format'
+import { counted, generateCSV, saveFile, today } from './format'
 import { fetchTransactionsCsv } from './hooks'
 import type { Ledger } from './useLedger'
 import type { Transaction } from './types'
@@ -36,7 +36,7 @@ export function useExports(ledger: Ledger) {
       return
     }
     saveFile(csvBlob(ledger.loaded), `transactions_filtered_${today()}.csv`)
-    toast({ title: `${ledger.loaded.length} transactions exportées` })
+    toast({ title: counted(ledger.loaded.length, 'transaction exportée', 'transactions exportées') })
   }
 
   const exportSelected = () => {
@@ -46,7 +46,7 @@ export function useExports(ledger: Ledger) {
     }
     const selected = ledger.sorted.filter((tx) => ledger.selection.ids.has(tx.id))
     saveFile(csvBlob(selected), `transactions_selected_${today()}.csv`)
-    toast({ title: `${selected.length} transactions exportées` })
+    toast({ title: counted(selected.length, 'transaction exportée', 'transactions exportées') })
   }
 
   return { exportingAll, exportAll, exportFiltered, exportSelected }

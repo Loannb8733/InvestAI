@@ -31,7 +31,7 @@
   ],
   "toasts": [
     {
-      "title": "2 supprimées, 1 erreurs",
+      "title": "2 supprimées, 1 erreur",
       "variant": "destructive"
     }
   ]

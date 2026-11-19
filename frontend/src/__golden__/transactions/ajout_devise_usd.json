@@ -14,7 +14,8 @@
         "quantity": 0.02,
         "price": 50000,
         "fee": 2,
-        "exchange": "Binance"
+        "exchange": "Binance",
+        "currency": "USD"
       }
     }
   ]

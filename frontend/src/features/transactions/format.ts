@@ -1,3 +1,4 @@
+import { formatCurrency } from '@/lib/utils'
 import type { Transaction } from './types'
 
 export function formatQuantity(quantity: number): string {
@@ -9,6 +10,14 @@ export function formatQuantity(quantity: number): string {
   if (absQuantity >= 0.0001) return q.toLocaleString('fr-FR', { maximumFractionDigits: 6 })
   return q.toLocaleString('fr-FR', { maximumSignificantDigits: 4 })
 }
+
+export const counted = (count: number, singular: string, plural: string) =>
+  `${count.toLocaleString('fr-FR')} ${count > 1 ? plural : singular}`
+
+const FIAT = new Set(['EUR', 'USD', 'GBP', 'CHF'])
+
+export const formatAmount = (value: number, currency: string) =>
+  FIAT.has(currency) ? formatCurrency(value, currency) : `${formatQuantity(value)} ${currency}`
 
 export function getDateRangeStart(value: string): Date | null {
   if (value === '0') return null

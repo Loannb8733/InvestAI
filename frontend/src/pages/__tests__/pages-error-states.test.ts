@@ -50,9 +50,16 @@ const lireModule = (chemin: string) => {
   return fichier ? readFileSync(fichier, 'utf-8') : ''
 }
 
+const lireFeature = (chemin: string) => {
+  const src = lireModule(chemin)
+  const dossier = chemin.slice(0, chemin.lastIndexOf('/'))
+  const voisins = [...src.matchAll(/from '\.\/([^']+)'/g)].map(([, nom]) => lireModule(`${dossier}/${nom}`))
+  return [src, ...voisins].join('\n')
+}
+
 const source = (page: string) => {
   const src = lireModule(`pages/${page}`)
-  const features = [...src.matchAll(/from '@\/(features\/[^']+)'/g)].map(([, chemin]) => lireModule(chemin))
+  const features = [...src.matchAll(/from '@\/(features\/[^']+)'/g)].map(([, chemin]) => lireFeature(chemin))
   return [src, ...features].join('\n')
 }
 

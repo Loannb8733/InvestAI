@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { changesOf, draftOf, draftTotal, EMPTY_DRAFT, type EditDraft } from '../editDraft'
+import { formatAmount } from '../format'
 import { useUpdateTransaction } from '../hooks'
 import { ALL_TYPE_BUTTONS, findTypeButton } from '../typeButtons'
 import type { Transaction } from '../types'
@@ -64,7 +65,7 @@ export default function EditTransactionForm({ transaction, open, onOpenChange }:
   const set = (field: keyof EditDraft) => (value: string) => setDraft((d) => ({ ...d, [field]: value }))
   const typeConfig = findTypeButton(ALL_TYPE_BUTTONS, draft.transactionType)
   const total = draftTotal(draft)
-  const feeCurrencies = [transaction.asset_symbol, 'EUR', 'USD', 'BTC', 'ETH', 'USDT', 'USDC'].filter((v, i, a) => v && a.indexOf(v) === i)
+  const feeCurrencies = [draft.currency, transaction.asset_symbol, 'EUR', 'USD', 'BTC', 'ETH', 'USDT', 'USDC'].filter((v, i, a) => v && a.indexOf(v) === i)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -133,7 +134,7 @@ export default function EditTransactionForm({ transaction, open, onOpenChange }:
               <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-muted-foreground">Montant total</span>
-                  <span className="text-sm font-semibold">{formatCurrency(total)}</span>
+                  <span className="text-sm font-semibold">{formatAmount(total, draft.currency)}</span>
                 </div>
               </div>
             )}

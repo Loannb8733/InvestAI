@@ -194,8 +194,8 @@
     "Zone dangereuse",
     "Supprimer toutes les transactions",
     "Supprime",
-    "23",
-    "transactions et remet les quantités à zéro.",
+    "24 transactions",
+    "et remet les quantités à zéro.",
     "Tout supprimer"
   ],
   "calls": [
@@ -408,8 +408,8 @@
     "Zone dangereuse",
     "Supprimer toutes les transactions",
     "Supprime",
-    "24",
-    "transactions et remet les quantités à zéro.",
+    "24 transactions",
+    "et remet les quantités à zéro.",
     "Tout supprimer"
   ]
 }

@@ -1,4 +1,5 @@
 import { CheckCircle, SkipForward, XCircle } from 'lucide-react'
+import { counted } from '../format'
 import type { CsvImportResult } from '../types'
 
 export default function ImportResultPanel({ result }: { result: CsvImportResult }) {
@@ -9,19 +10,19 @@ export default function ImportResultPanel({ result }: { result: CsvImportResult 
         {result.success_count > 0 && (
           <div className="flex items-center gap-2 text-gain">
             <CheckCircle className="h-5 w-5" />
-            <span>{result.success_count} importées</span>
+            <span>{counted(result.success_count, 'importée', 'importées')}</span>
           </div>
         )}
         {result.error_count > 0 && (
           <div className="flex items-center gap-2 text-loss">
             <XCircle className="h-5 w-5" />
-            <span>{result.error_count} erreurs</span>
+            <span>{counted(result.error_count, 'erreur', 'erreurs')}</span>
           </div>
         )}
         {skipped > 0 && (
           <div className="flex items-center gap-2 text-muted-foreground">
             <SkipForward className="h-5 w-5" />
-            <span>{skipped} déjà présentes</span>
+            <span>{counted(skipped, 'déjà présente', 'déjà présentes')}</span>
           </div>
         )}
       </div>

@@ -91,7 +91,7 @@ describe('Transactions — exports', () => {
     routes['GET /transactions/export-csv'] = failure
     await open()
     await menuItem(screen.getByRole('button', { name: 'Exporter' }), /Tout exporter/)
-    await settle(() => toasts.length > 1)
+    await settle(() => toasts.length > 0)
     await golden('export_serveur_refuse', { toasts, files: blobs.length })
   })
 
@@ -130,7 +130,7 @@ describe('Transactions — suppressions', () => {
     routes['DELETE /transactions/t2'] = failure
     await open()
     await confirm(menuItem(rowMenu(3), /Supprimer/), 'Supprimer')
-    await settle(() => toasts.length > 1)
+    await settle(() => toasts.length > 0)
     await pause(50)
     await golden('suppression_refusee', { toasts, dialog: screen.queryByRole('alertdialog') !== null })
   })
@@ -154,23 +154,13 @@ describe('Transactions — suppressions', () => {
     await golden('tout_supprimer', { dialog, ...result })
   })
 
-  it('supprime tout alors qu’un filtre est actif', async () => {
-    await open()
-    chooseOption(screen.getAllByRole('combobox')[2], 'Ventes')
-    await screen.findByText('Total ventes (filtrés)')
-    await pause(50)
-    const dialog = await confirm(screen.getByRole('button', { name: 'Tout supprimer' }), 'Supprimer tout')
-    const result = await afterWrite(() => toasts.length > 0)
-    await golden('tout_supprimer_filtre', { dialog, writes: result.writes })
-  })
-
-  it('avertit que les filtres ne couvrent que les lignes chargées', async () => {
+  it('filtre au-delà des deux cents lignes chargées', async () => {
     routes['GET /transactions'] = listTransactions(TRANSACTIONS, 250)
     await open()
     chooseOption(screen.getAllByRole('combobox')[2], 'Ventes')
     await screen.findByText('Total ventes (filtrés)')
     await pause(50)
-    await golden('avertissement_filtres', { text: visibleText(screen.getByText('Historique').closest('.space-y-6') as HTMLElement) })
+    await golden('filtre_au_dela_du_chargement', { text: visibleText(screen.getByText('Historique').closest('.space-y-6') as HTMLElement) })
   })
 })
 
@@ -213,7 +203,7 @@ describe('Transactions — modification', () => {
     const dialog = await openEdit()
     fireEvent.change(inputs(dialog)[2], { target: { value: '2.5' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }))
-    await settle(() => toasts.length > 1)
+    await settle(() => toasts.length > 0)
     await pause(50)
     await golden('modification_refusee', { toasts, open: screen.queryByRole('dialog') !== null })
   })

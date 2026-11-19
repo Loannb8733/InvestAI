@@ -17,7 +17,6 @@
     "Crypto",
     "Crypto",
     "Bourse",
-    "Mes prêts",
     "Actif",
     "Nouveau",
     "BTC",
@@ -47,7 +46,7 @@
     "Notes",
     "Résumé de l'impact",
     "Nouveau solde",
-    "0.48 BTC",
+    "0,48 BTC",
     "Montant récupéré",
     "+",
     "1 002,00 €",
@@ -65,6 +64,7 @@
         "price": 50000,
         "fee": 2,
         "exchange": "Binance",
+        "currency": "EUR",
         "destination_exchange": "Ledger"
       }
     }

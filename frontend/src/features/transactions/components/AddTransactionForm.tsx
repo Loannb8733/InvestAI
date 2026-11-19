@@ -14,6 +14,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { addSchema, toNum, type AddInput, type AddOutput } from '../addSchema'
 import { assetBody, EMPTY_ASSET_DRAFT } from '../assetDraft'
 import { useCreateAsset, useCreateTransaction } from '../hooks'
+import { acceptsTransactions } from '../ledger'
 import { findTypeButton, MOVEMENT_BUTTONS } from '../typeButtons'
 import AssetPicker from './AssetPicker'
 import ImpactSummary from './ImpactSummary'
@@ -76,6 +77,7 @@ export default function AddTransactionForm({ onSuccess, assetId, assetSymbol, op
   const submit = (data: AddOutput) =>
     create.mutate({
       ...data,
+      currency,
       executed_at: data.executed_at || undefined,
       notes: data.notes || undefined,
       exchange: data.exchange || undefined,
@@ -89,7 +91,7 @@ export default function AddTransactionForm({ onSuccess, assetId, assetSymbol, op
       <div className="space-y-4 py-3">
         <TypeToggle buttons={MOVEMENT_BUTTONS} value={type} onChange={(value) => setValue('transaction_type', value as AddOutput['transaction_type'])} />
         <AssetPicker
-          portfolios={portfolios ?? []}
+          portfolios={(portfolios ?? []).filter(acceptsTransactions)}
           portfolioId={portfolioId}
           onPortfolioChange={(value) => {
             setPortfolioId(value)

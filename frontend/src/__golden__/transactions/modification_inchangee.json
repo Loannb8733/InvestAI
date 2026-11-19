@@ -1,20 +1,9 @@
 {
-  "writes": [
-    {
-      "method": "PATCH",
-      "url": "/transactions/t1",
-      "body": {
-        "fee_currency": "ETH"
-      }
-    }
-  ],
-  "reads": [
-    "/portfolios",
-    "/transactions"
-  ],
+  "writes": [],
+  "reads": [],
   "toasts": [
     {
-      "title": "Transaction mise à jour"
+      "title": "Aucune modification"
     }
   ]
 }
