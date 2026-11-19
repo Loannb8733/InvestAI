@@ -154,6 +154,6 @@ describe("le compte rendu d'import", () => {
     await importer()
 
     expect(await screen.findByText(/7 déjà présentes/)).toBeInTheDocument()
-    expect(screen.getByText(/1 importées/)).toBeInTheDocument()
+    expect(screen.getByText('1 importée')).toBeInTheDocument()
   })
 })

@@ -1,5 +1,6 @@
 import { Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatQuantity } from '../format'
 
 interface ImpactSummaryProps {
   type: string
@@ -10,7 +11,7 @@ interface ImpactSummaryProps {
   format: (value: number) => string
 }
 
-const formatHolding = (value: number, symbol: string) => `${value.toFixed(8).replace(/\.?0+$/, '')} ${symbol}`
+const formatHolding = (value: number, symbol: string) => `${formatQuantity(value)} ${symbol}`
 
 export default function ImpactSummary({ type, symbol, held, quantity, total, format }: ImpactSummaryProps) {
   const neutral = ['staking', 'unstaking'].includes(type)

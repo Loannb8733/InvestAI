@@ -1,4 +1,7 @@
+import { localDay } from './format'
 import type { Transaction, TransactionType, TransactionUpdate } from './types'
+
+const MINUTE = 60_000
 
 export interface EditDraft {
   transactionType: TransactionType | ''
@@ -20,9 +23,9 @@ export function draftOf(tx: Transaction, previous: EditDraft): EditDraft {
     quantity: tx.quantity.toString(),
     price: tx.price.toString(),
     fee: (tx.fee ?? 0).toString(),
-    feeCurrency: tx.fee_currency || tx.asset_symbol || '',
+    feeCurrency: tx.fee_currency || tx.currency || 'EUR',
     currency: tx.currency || 'EUR',
-    executedDate: executed ? executed.toISOString().split('T')[0] : previous.executedDate,
+    executedDate: executed ? (localDay(executed) ?? '') : previous.executedDate,
     executedTime: executed ? executed.toTimeString().slice(0, 5) : previous.executedTime,
     exchange: tx.exchange || '',
     notes: tx.notes || '',
@@ -44,9 +47,10 @@ export const EMPTY_DRAFT: EditDraft = {
 
 function changedDate(tx: Transaction, draft: EditDraft): string | undefined {
   if (!draft.executedDate || !draft.executedTime) return undefined
-  const executedAt = `${draft.executedDate}T${draft.executedTime}:00`
-  const before = tx.executed_at ? new Date(tx.executed_at).getTime() : null
-  return before === null || before !== new Date(executedAt).getTime() ? executedAt : undefined
+  const executed = new Date(`${draft.executedDate}T${draft.executedTime}:00`)
+  if (isNaN(executed.getTime())) return undefined
+  const before = tx.executed_at ? Math.floor(new Date(tx.executed_at).getTime() / MINUTE) : null
+  return before === Math.floor(executed.getTime() / MINUTE) ? undefined : executed.toISOString()
 }
 
 export function changesOf(tx: Transaction, draft: EditDraft): TransactionUpdate {
@@ -58,7 +62,7 @@ export function changesOf(tx: Transaction, draft: EditDraft): TransactionUpdate 
   if (!isNaN(quantity) && quantity !== tx.quantity) updates.quantity = quantity
   if (!isNaN(price) && price !== tx.price) updates.price = price
   if (!isNaN(fee) && fee !== (tx.fee ?? 0)) updates.fee = fee
-  if (draft.feeCurrency && draft.feeCurrency !== (tx.fee_currency || '')) updates.fee_currency = draft.feeCurrency
+  if (draft.feeCurrency && draft.feeCurrency !== (tx.fee_currency || draft.currency)) updates.fee_currency = draft.feeCurrency
   if (draft.currency && draft.currency !== tx.currency) updates.currency = draft.currency
   const executedAt = changedDate(tx, draft)
   if (executedAt) updates.executed_at = executedAt

@@ -1,4 +1,4 @@
-import { AlertTriangle, FileText, Plus, Search, X } from 'lucide-react'
+import { FileText, Plus, Search, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -84,18 +84,6 @@ export default function LedgerCard({ ledger, onExportSelected, onAdd, onEdit, on
         </div>
       </CardHeader>
       <CardContent>
-        {filtered && ledger.hasMore && (
-          <div className="flex items-start gap-2 mb-4 px-3 py-2 rounded-md border border-warning/30 bg-warning/10 text-sm text-warning">
-            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-            <span>
-              Filtres appliqués sur les {ledger.loaded.length} transactions chargées — les suivantes n'ont pas été parcourues.{' '}
-              <button type="button" className="underline underline-offset-2 hover:opacity-80 font-medium" onClick={ledger.loadMore}>
-                Charger plus
-              </button>{' '}
-              pour une vue exhaustive.
-            </span>
-          </div>
-        )}
         {ledger.visible.length > 0 ? (
           <>
             <TransactionTable ledger={ledger} onEdit={onEdit} onDelete={onDelete} />

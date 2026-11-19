@@ -1,9 +1,7 @@
 import { useState, type ReactNode } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { Plus, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { queryKeys } from '@/lib/queryKeys'
 import AddTransactionForm from './AddTransactionForm'
 import ImportCSVForm from './ImportCSVForm'
 
@@ -15,9 +13,7 @@ interface TransactionsHeaderProps {
 }
 
 export default function TransactionsHeader({ portfolioId, adding, onAddingChange, exportMenu }: TransactionsHeaderProps) {
-  const queryClient = useQueryClient()
   const [importing, setImporting] = useState(false)
-  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all })
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -41,10 +37,7 @@ export default function TransactionsHeader({ portfolioId, adding, onAddingChange
             </DialogHeader>
             <ImportCSVForm
               portfolioId={portfolioId}
-              onSuccess={() => {
-                setImporting(false)
-                refresh()
-              }}
+              onSuccess={() => setImporting(false)}
             />
           </DialogContent>
         </Dialog>
@@ -61,11 +54,7 @@ export default function TransactionsHeader({ portfolioId, adding, onAddingChange
               <DialogDescription>Enregistrez une nouvelle transaction</DialogDescription>
             </DialogHeader>
             <AddTransactionForm
-              onSuccess={() => {
-                onAddingChange(false)
-                refresh()
-                queryClient.invalidateQueries({ queryKey: queryKeys.assets.all })
-              }}
+              onSuccess={() => onAddingChange(false)}
             />
           </DialogContent>
         </Dialog>

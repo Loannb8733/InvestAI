@@ -17,7 +17,6 @@
     "Crypto",
     "Crypto",
     "Bourse",
-    "Mes prêts",
     "Actif",
     "Nouveau",
     "BTC",
@@ -42,7 +41,7 @@
     "Notes",
     "Résumé de l'impact",
     "Nouveau solde",
-    "0.52 BTC",
+    "0,52 BTC",
     "Impact Cash",
     "-",
     "1 002,00 €",
@@ -59,16 +58,15 @@
         "quantity": 0.02,
         "price": 50000,
         "fee": 2,
-        "exchange": "Binance"
+        "exchange": "Binance",
+        "currency": "EUR"
       }
     }
   ],
   "reads": [
     "/portfolios",
     "/assets",
-    "/transactions",
-    "/transactions",
-    "/assets"
+    "/transactions"
   ],
   "toasts": [
     {

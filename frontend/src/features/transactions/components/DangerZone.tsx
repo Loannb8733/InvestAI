@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { counted } from '../format'
 import { useDeleteAll } from '../hooks'
 import DeleteAction from './DeleteAction'
 
@@ -33,7 +34,7 @@ export default function DangerZone({ portfolioId, count }: DangerZoneProps) {
         <div className="flex items-center justify-between">
           <div>
             <p className="font-medium text-sm">Supprimer toutes les transactions</p>
-            <p className="text-xs text-muted-foreground">Supprime {count} transactions et remet les quantités à zéro.</p>
+            <p className="text-xs text-muted-foreground">Supprime {counted(count, 'transaction', 'transactions')} et remet les quantités à zéro.</p>
           </div>
           <AlertDialog>
             <AlertDialogTrigger asChild>

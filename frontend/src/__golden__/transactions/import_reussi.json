@@ -13,7 +13,6 @@
   ],
   "reads": [
     "/portfolios",
-    "/transactions",
     "/transactions"
   ],
   "toasts": [

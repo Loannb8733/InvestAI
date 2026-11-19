@@ -58,3 +58,5 @@ export function pageNumbers(current: number, total: number): number[] {
   const first = total <= 5 || current <= 3 ? 1 : current >= total - 2 ? total - 4 : current - 2
   return Array.from({ length }, (_, i) => first + i)
 }
+
+export const acceptsTransactions = (portfolio: { kind?: string | null }) => portfolio.kind !== 'crowdfunding'

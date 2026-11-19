@@ -1,4 +1,5 @@
 import type { AxiosError } from 'axios'
+import { counted } from './format'
 import type { CsvImportResult } from './types'
 
 interface Feedback {
@@ -10,25 +11,28 @@ interface Feedback {
 
 export function importFeedback(result: CsvImportResult): Feedback {
   const skipped = result.skipped_count ?? 0
-  const skippedNote = skipped > 0 ? ` ${skipped} déjà présentes, ignorées.` : ''
+  const skippedNote = skipped > 0 ? ` ${counted(skipped, 'déjà présente, ignorée', 'déjà présentes, ignorées')}.` : ''
+  const imported = counted(result.success_count, 'transaction importée', 'transactions importées')
+  const errors = counted(result.error_count, 'erreur', 'erreurs')
   if (result.success_count > 0 && result.error_count === 0) {
     return {
       title: 'Import réussi',
-      description: `${result.success_count} transactions importées avec succès.${skippedNote}`,
+      description: `${imported} avec succès.${skippedNote}`,
       succeeded: true,
     }
   }
   if (result.success_count > 0 && result.error_count > 0) {
     return {
       title: 'Import partiel',
-      description: `${result.success_count} transactions importées, ${result.error_count} erreurs.${skippedNote}`,
+      description: `${imported}, ${errors}.${skippedNote}`,
       succeeded: false,
     }
   }
   if (result.error_count === 0 && skipped > 0) {
-    return { title: 'Rien de nouveau', description: `${skipped} transactions étaient déjà présentes.`, succeeded: false }
+    const known = counted(skipped, 'transaction était déjà présente', 'transactions étaient déjà présentes')
+    return { title: 'Rien de nouveau', description: `${known}.`, succeeded: false }
   }
-  return { variant: 'destructive', title: "Échec de l'import", description: `${result.error_count} erreurs détectées.`, succeeded: false }
+  return { variant: 'destructive', title: "Échec de l'import", description: `${counted(result.error_count, 'erreur détectée', 'erreurs détectées')}.`, succeeded: false }
 }
 
 export function importErrorMessage(error: unknown): string {

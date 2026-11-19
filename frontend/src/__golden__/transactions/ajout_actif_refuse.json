@@ -1,0 +1,22 @@
+{
+  "writes": [
+    {
+      "method": "POST",
+      "url": "/assets",
+      "body": {
+        "portfolio_id": "p1",
+        "symbol": "BTC",
+        "name": "BTC",
+        "asset_type": "crypto",
+        "exchange": "Kraken"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Cet actif existe déjà dans ce portefeuille"
+    }
+  ]
+}

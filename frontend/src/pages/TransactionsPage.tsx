@@ -63,7 +63,7 @@ export default function TransactionsPage() {
         onEdit={setEditing}
         onDelete={setDeleting}
       />
-      {hasRows && <DangerZone portfolioId={portfolioId} count={ledger.loaded.length} />}
+      {hasRows && !filtered && <DangerZone portfolioId={portfolioId} count={ledger.total} />}
       <EditTransactionForm transaction={editing} open={editing !== null} onOpenChange={(open) => !open && setEditing(null)} />
       <DeleteTransactionDialog transaction={deleting} onClose={() => setDeleting(null)} />
     </div>

@@ -4,8 +4,7 @@
       "method": "PATCH",
       "url": "/transactions/t1",
       "body": {
-        "quantity": 2.5,
-        "fee_currency": "ETH"
+        "quantity": 2.5
       }
     }
   ],
