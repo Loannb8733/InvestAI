@@ -175,19 +175,26 @@ Pour mémoire, l'ensemble de modèles d'avant (pas de 21 jours, test 1) faisait 
 quotidiennes). Le banc à 21 jours (`backtest.py`, `report.py`) reste disponible, avec `BT_SKIP` et `BT_DATA` pour
 la validation et les tests.
 
-### Modèle de fondation : Chronos-Bolt
+### Modèles de fondation : Chronos
 
-`amazon/chronos-bolt-small` (chronos-forecasting 2.3.2), utilisé sans réentraînement, avec un contexte des 512
-derniers cours. Il est évalué sur la validation quotidienne (`chronos_eval.py`, environnement à part
-`~/envs/chronos`), contre le naïf et contre la correction retenue :
+Trois modèles d'Amazon (chronos-forecasting 2.3.2), utilisés sans réentraînement avec un contexte des 512
+derniers cours. Ils sont évalués sur la validation quotidienne (`chronos_eval.py <données> <début> <fin> <modèle>`,
+environnement à part `~/envs/chronos`), contre le naïf et contre la correction retenue. Deux prévisions par
+modèle : la médiane, et le point qui minimise l'erreur relative attendue sous les quantiles 10 % à 90 %.
 
-| Horizon | Prévisions | Naïf | Correction retenue | Chronos médiane | Chronos point MAPE | DM médiane / naïf | Pire actif / naïf |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| 1 j | 5 448 | 2,514 % | **2,512 %** | 3,054 % | 3,162 % | +20,7 | 1,39 |
-| 7 j | 5 412 | 7,017 % | **6,996 %** | 7,459 % | 7,796 % | +5,8 | 1,19 |
-| 30 j | 5 274 | 14,489 % | **14,274 %** | 15,643 % | 16,303 % | +3,5 | 1,18 |
+| Modèle | Horizon | Naïf | Correction retenue | Médiane | Point MAPE | DM médiane / naïf | Pire actif / naïf |
+|---|---|---:|---:|---:|---:|---:|---:|
+| chronos-bolt-small | 1 j | 2,514 % | **2,512 %** | 3,054 % | 3,162 % | +20,7 | 1,39 |
+| | 7 j | 7,017 % | **6,996 %** | 7,459 % | 7,796 % | +5,8 | 1,19 |
+| | 30 j | 14,489 % | **14,274 %** | 15,643 % | 16,303 % | +3,5 | 1,18 |
+| chronos-bolt-base | 1 j | 2,514 % | **2,512 %** | 3,197 % | 3,333 % | +22,2 | 1,60 |
+| | 7 j | 7,017 % | **6,996 %** | 7,692 % | 8,091 % | +7,7 | 1,26 |
+| | 30 j | 14,489 % | **14,274 %** | 16,387 % | 16,969 % | +4,9 | 1,34 |
+| Chronos-2 | 1 j | 2,514 % | **2,512 %** | 2,869 % | 2,863 % | +16,5 | 1,20 |
+| | 7 j | 7,017 % | **6,996 %** | 7,362 % | 7,361 % | +5,7 | 1,07 |
+| | 30 j | 14,489 % | **14,274 %** | 16,075 % | 15,697 % | +2,7 | 1,20 |
 
-Chronos est significativement moins bon que le naïf à chaque horizon : +21 % d'erreur à 1 jour. Il projette des
-motifs appris sur d'autres séries, alors que les cours crypto quotidiens sont proches d'une marche aléatoire.
-Écarté sur la validation, il n'a été évalué sur aucun jeu de test. Les variantes plus grosses (chronos-bolt-base,
-Chronos-2) n'ont pas été téléchargées.
+Les trois sont significativement moins bons que le naïf à chaque horizon, de 5 à 27 % d'erreur en plus. Le
+modèle plus gros (bolt-base) fait pire que le petit. Le plus récent (Chronos-2) est le meilleur des trois, et
+reste perdant. Ils prolongent des motifs appris sur d'autres séries, alors que les cours crypto quotidiens sont
+proches d'une marche aléatoire. Tous ont été écartés sur la validation, sans qu'aucun jeu de test soit utilisé.

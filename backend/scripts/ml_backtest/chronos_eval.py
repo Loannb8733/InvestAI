@@ -42,6 +42,15 @@ def mape_point(quantiles: np.ndarray) -> np.ndarray:
     return np.take_along_axis(quantiles, best[..., None], axis=-1)[..., 0]
 
 
+def _quantiles(pipe: BaseChronosPipeline, ctx: list[torch.Tensor]) -> np.ndarray:
+    """Quantiles (série, horizon, niveau) : Chronos-Bolt rend un tenseur, Chronos-2 une liste par série."""
+    if type(pipe).__name__.startswith("Chronos2"):
+        q, _ = pipe.predict_quantiles([c[None, :] for c in ctx], prediction_length=30, quantile_levels=LEVELS)
+        return np.stack([np.asarray(x).reshape(-1, 30, len(LEVELS))[0] for x in q])
+    q, _ = pipe.predict_quantiles(ctx, prediction_length=30, quantile_levels=LEVELS)
+    return q.numpy()
+
+
 def main(data_file: str, start: str, stop: str, model: str) -> None:
     raw = json.loads((HERE / "data" / data_file).read_text())
     pipe = BaseChronosPipeline.from_pretrained(model, device_map="cpu", torch_dtype=torch.float32)
@@ -53,8 +62,7 @@ def main(data_file: str, start: str, stop: str, model: str) -> None:
         for b in range(0, len(origins), BATCH):
             chunk = origins[b : b + BATCH]
             ctx = [torch.tensor(closes[i - CONTEXT + 1 : i + 1]) for i in chunk]
-            q, _ = pipe.predict_quantiles(ctx, prediction_length=30, quantile_levels=LEVELS)
-            q = q.numpy()
+            q = _quantiles(pipe, ctx)
             median, best = q[..., LEVELS.index(0.5)], mape_point(q)
             for j, i in enumerate(chunk):
                 p0 = closes[i]
