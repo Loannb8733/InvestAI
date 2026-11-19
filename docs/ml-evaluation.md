@@ -175,8 +175,19 @@ Pour mémoire, l'ensemble de modèles d'avant (pas de 21 jours, test 1) faisait 
 quotidiennes). Le banc à 21 jours (`backtest.py`, `report.py`) reste disponible, avec `BT_SKIP` et `BT_DATA` pour
 la validation et les tests.
 
-### Non testé
+### Modèle de fondation : Chronos-Bolt
 
-Les modèles de fondation pour séries temporelles (Chronos, TimesFM) utilisés sans réentraînement : il faut
-installer un paquet et télécharger des poids depuis Hugging Face. Les études publiées ne les voient pas battre le
-naïf sur des cours de crypto quotidiens, mais ce n'est pas vérifié ici.
+`amazon/chronos-bolt-small` (chronos-forecasting 2.3.2), utilisé sans réentraînement, avec un contexte des 512
+derniers cours. Il est évalué sur la validation quotidienne (`chronos_eval.py`, environnement à part
+`~/envs/chronos`), contre le naïf et contre la correction retenue :
+
+| Horizon | Prévisions | Naïf | Correction retenue | Chronos médiane | Chronos point MAPE | DM médiane / naïf | Pire actif / naïf |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 1 j | 5 448 | 2,514 % | **2,512 %** | 3,054 % | 3,162 % | +20,7 | 1,39 |
+| 7 j | 5 412 | 7,017 % | **6,996 %** | 7,459 % | 7,796 % | +5,8 | 1,19 |
+| 30 j | 5 274 | 14,489 % | **14,274 %** | 15,643 % | 16,303 % | +3,5 | 1,18 |
+
+Chronos est significativement moins bon que le naïf à chaque horizon : +21 % d'erreur à 1 jour. Il projette des
+motifs appris sur d'autres séries, alors que les cours crypto quotidiens sont proches d'une marche aléatoire.
+Écarté sur la validation, il n'a été évalué sur aucun jeu de test. Les variantes plus grosses (chronos-bolt-base,
+Chronos-2) n'ont pas été téléchargées.
