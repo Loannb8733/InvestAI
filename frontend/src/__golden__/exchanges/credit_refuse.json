@@ -17,14 +17,9 @@
   ],
   "toasts": [
     {
-      "title": "Erreur serveur",
-      "description": "boom",
-      "variant": "destructive"
-    },
-    {
       "variant": "destructive",
       "title": "Erreur lors du crédit auto",
-      "description": "Request failed with status code 500"
+      "description": "boom"
     }
   ]
 }

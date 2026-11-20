@@ -1,7 +1,7 @@
 import { CheckCircle, Wallet, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { formatBalance } from '../format'
+import { counted, formatQuantity } from '@/lib/utils'
 import type { TestResult } from '../types'
 
 interface TestResultDialogProps {
@@ -27,7 +27,7 @@ export default function TestResultDialog({ result, onClose }: TestResultDialogPr
             <div className="mt-4">
               <div className="flex items-center gap-2 mb-3">
                 <Wallet className="h-4 w-4 text-muted-foreground" />
-                <p className="font-medium">Soldes détectés ({balances.length} actifs)</p>
+                <p className="font-medium">Soldes détectés ({counted(balances.length, 'actif', 'actifs')})</p>
               </div>
               <div className="grid gap-2 max-h-64 overflow-y-auto pr-2">
                 {balances
@@ -35,7 +35,7 @@ export default function TestResultDialog({ result, onClose }: TestResultDialogPr
                   .map(([symbol, amount]) => (
                     <div key={symbol} className="flex justify-between items-center bg-muted p-2 rounded-md">
                       <span className="font-medium">{symbol}</span>
-                      <span className="font-mono text-sm">{formatBalance(amount)}</span>
+                      <span className="font-mono text-sm">{formatQuantity(amount)}</span>
                     </div>
                   ))}
               </div>

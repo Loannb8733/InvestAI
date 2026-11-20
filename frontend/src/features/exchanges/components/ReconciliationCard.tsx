@@ -1,7 +1,7 @@
 import { AlertCircle, CheckCircle, Coins, Info, Loader2, RefreshCw, Scale } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatDateTime } from '@/lib/utils'
+import { counted, formatCurrency, formatDateTime } from '@/lib/utils'
 import { totalMissingEur } from '../format'
 import type { Reconciliation } from '../reconciliation'
 import GapTable from './GapTable'
@@ -58,9 +58,9 @@ export default function ReconciliationCard({ reconciliation }: { reconciliation:
             <div className="flex items-start gap-2 text-sm text-warning bg-warning/10 p-3 rounded-md">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>
-                {check.gaps.length} récompense(s) non tracée(s) détectée(s) — total estimé
-                {' '}
-                {totalMissingEur(check.gaps).toFixed(2)} €.
+                {counted(check.gaps.length, 'récompense non tracée détectée', 'récompenses non tracées détectées')}
+                {' — total estimé '}
+                {formatCurrency(totalMissingEur(check.gaps))}.
               </span>
             </div>
             <GapTable gaps={check.gaps} />

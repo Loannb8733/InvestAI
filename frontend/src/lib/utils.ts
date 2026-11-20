@@ -42,6 +42,19 @@ export function formatPercent(value: number | string | null | undefined): string
   }).format(num / 100)
 }
 
+export function formatQuantity(quantity: number): string {
+  const q = Number(quantity)
+  if (!q) return '0'
+  const absQuantity = Math.abs(q)
+  if (absQuantity >= 1000) return q.toLocaleString('fr-FR', { maximumFractionDigits: 2 })
+  if (absQuantity >= 1) return q.toLocaleString('fr-FR', { maximumFractionDigits: 4 })
+  if (absQuantity >= 0.0001) return q.toLocaleString('fr-FR', { maximumFractionDigits: 6 })
+  return q.toLocaleString('fr-FR', { maximumSignificantDigits: 4 })
+}
+
+export const counted = (count: number, singular: string, plural: string) =>
+  `${count.toLocaleString('fr-FR')} ${count > 1 ? plural : singular}`
+
 export function formatDate(dateString: string | null | undefined): string {
   if (!dateString) return "—"
   return new Date(dateString).toLocaleDateString("fr-FR", {

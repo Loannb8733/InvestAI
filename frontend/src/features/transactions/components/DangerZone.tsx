@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { counted } from '../format'
+import { counted } from '@/lib/utils'
 import { useDeleteAll } from '../hooks'
 import DeleteAction from './DeleteAction'
 

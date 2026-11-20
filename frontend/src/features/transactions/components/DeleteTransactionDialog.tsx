@@ -8,7 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { formatQuantity } from '../format'
+import { formatQuantity } from '@/lib/utils'
 import { useDeleteTransaction } from '../hooks'
 import { typeLabel } from '../labels'
 import type { Transaction } from '../types'

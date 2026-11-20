@@ -36,7 +36,7 @@ function WalletList({ wallets, deleting, onDelete }: { wallets: ColdWallet[]; de
 export default function ColdWalletsManager() {
   const [address, setAddress] = useState('')
   const [label, setLabel] = useState('')
-  const { data: wallets, isLoading, isError } = useColdWallets()
+  const { data: wallets, isLoading, isError, isFetching, refetch } = useColdWallets()
   const save = useSaveColdWallet(() => {
     setAddress('')
     setLabel('')
@@ -94,7 +94,13 @@ export default function ColdWalletsManager() {
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Chargement…</p>
         ) : isError ? (
-          <p className="text-sm text-destructive">Impossible de charger les cold wallets. Réessayez.</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-destructive">Impossible de charger les cold wallets.</p>
+            <Button variant="outline" size="sm" disabled={isFetching} onClick={() => refetch()}>
+              {isFetching && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
+              Réessayer
+            </Button>
+          </div>
         ) : !wallets || wallets.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Aucun cold wallet nommé. Ajoutez une adresse pour la router automatiquement.

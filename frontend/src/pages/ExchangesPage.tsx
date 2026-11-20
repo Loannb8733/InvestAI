@@ -14,6 +14,7 @@ import RenameDialog from '@/features/exchanges/components/RenameDialog'
 import SupportedExchangesCard from '@/features/exchanges/components/SupportedExchangesCard'
 import TestResultDialog from '@/features/exchanges/components/TestResultDialog'
 import WalletsCard from '@/features/exchanges/components/WalletsCard'
+import { guideFor } from '@/features/exchanges/guides/registry'
 import { useApiKeys, useCreateKey, useDeleteKey, useExchanges } from '@/features/exchanges/hooks'
 import { useKeyActions } from '@/features/exchanges/keyActions'
 import { useReconciliation } from '@/features/exchanges/reconciliation'
@@ -41,7 +42,8 @@ export default function ExchangesPage() {
     onSaved: () => setRenaming(null),
     onTaskCompleted: reconciliation.checkAfterTask,
   })
-  const nameOf = (exchangeId: string) => exchanges.data?.find((exchange) => exchange.id === exchangeId)?.name || exchangeId
+  const nameOf = (exchangeId: string) =>
+    exchanges.data?.find((exchange) => exchange.id === exchangeId)?.name || guideFor(exchangeId)?.name || exchangeId
 
   if (apiKeys.isLoading) {
     return <PageSkeleton titre="Exchanges" description={DESCRIPTION} niveauTitre={2} forme="cartes" action />
