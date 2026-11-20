@@ -12,6 +12,8 @@ Variables :
     BT_SYMBOLS   paires Binance, séparées par des virgules ;
     BT_STEP      jours entre deux origines ;
     BT_ORIGINS   nombre d'origines par paire ;
+    BT_SKIP      origines récentes à sauter (0 : le banc de 204 ; 34 : la période de validation qui le précède) ;
+    BT_DATA      fichier de données figées dans ``data/`` (le test final a le sien, pour rester à l'écart) ;
     BT_WORKERS   processus en parallèle ;
     BT_END       dernier jour des données figées (AAAA-MM-JJ).
 """
@@ -35,13 +37,14 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
 
 HERE = Path(__file__).resolve().parent
 BACKEND = Path(os.environ.get("BT_BACKEND", HERE.parents[1])).expanduser().resolve()
-DATA = HERE / "data" / "binance_daily.json"
+DATA = HERE / "data" / os.environ.get("BT_DATA", "binance_daily.json")
 SYMBOLS = os.environ.get("BT_SYMBOLS", "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT,ADAUSDT").split(",")
 END = os.environ.get("BT_END", "2026-11-15")
 HISTORY = 365
 HORIZON = 30
 STEP = int(os.environ.get("BT_STEP", "21"))
 N_ORIGINS = int(os.environ.get("BT_ORIGINS", "34"))
+SKIP = int(os.environ.get("BT_SKIP", "0"))
 WORKERS = int(os.environ.get("BT_WORKERS", "8"))
 MODELS = ["Prophet", "ARIMA", "XGBoost", "EMA", "Linear", "MeanReversion", "Naive"]
 
@@ -124,12 +127,17 @@ def one_origin(args: tuple) -> dict:
 def main(out_dir: str) -> None:
     raw = load_data()
     data = {s: ([datetime.fromisoformat(x) for x in r["dates"]], r["close"], r["quote_volume"]) for s, r in raw.items()}
-    btc_by_date = dict(zip(data["BTCUSDT"][0], data["BTCUSDT"][1], strict=True))
+    btc_raw = (
+        raw["BTCUSDT"]
+        if "BTCUSDT" in raw
+        else json.loads((HERE / "data" / "binance_daily.json").read_text())["BTCUSDT"]
+    )
+    btc_by_date = dict(zip([datetime.fromisoformat(x) for x in btc_raw["dates"]], btc_raw["close"], strict=True))
     jobs = []
     for s, (d, p, v) in data.items():
         btc = None if s == "BTCUSDT" else [btc_by_date.get(x) for x in d]
         last = len(p) - HORIZON
-        for k in range(N_ORIGINS):
+        for k in range(SKIP, SKIP + N_ORIGINS):
             i = last - k * STEP
             if i - HISTORY < 0:
                 break

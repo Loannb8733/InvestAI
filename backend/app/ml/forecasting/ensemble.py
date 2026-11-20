@@ -5,6 +5,7 @@ from typing import Any
 
 from app.ml.forecasting import confidence
 from app.ml.forecasting.cache import cached_hyperparams, run_cached
+from app.ml.forecasting.floor import floored
 from app.ml.forecasting.models.arima import arima_forecast
 from app.ml.forecasting.models.prophet import prophet_forecast
 from app.ml.forecasting.models.simple import (
@@ -236,6 +237,13 @@ class PriceForecaster:
         return self.run_model(name, prices, dates, days, hyperparams=hyperparams)
 
     def ensemble_forecast(
+        self, prices: list[float], dates: list[datetime], days_ahead: int = 7, **inputs: Any
+    ) -> ForecastResult:
+        """Ensemble des modèles (``_models_forecast``), puis trajectoire et intervalle ancrés par ``floor``."""
+        result = self._models_forecast(prices, dates, days_ahead, **inputs)
+        return floored(prices, result) if len(prices) >= 5 else result
+
+    def _models_forecast(
         self,
         prices: list[float],
         dates: list[datetime],
