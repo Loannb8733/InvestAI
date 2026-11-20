@@ -58,8 +58,7 @@
       "url": "/transactions/balance-gaps/credit-all",
       "params": {
         "threshold_eur": 5
-      },
-      "body": null
+      }
     },
     {
       "method": "GET",
