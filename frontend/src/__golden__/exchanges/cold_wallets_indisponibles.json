@@ -1,0 +1,22 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    }
+  ],
+  "card": [
+    "Cold wallets",
+    "Associez vos adresses de retrait à un nom (Tangem, Ledger…). La synchronisation routera chaque retrait vers le bon cold wallet ; une adresse inconnue retombe sur « Tangem » par défaut.",
+    "Adresse de retrait",
+    "Nom du wallet",
+    "Ajouter",
+    "Impossible de charger les cold wallets. Réessayez."
+  ]
+}

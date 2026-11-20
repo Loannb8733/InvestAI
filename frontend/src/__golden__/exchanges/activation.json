@@ -1,0 +1,40 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    },
+    {
+      "method": "PATCH",
+      "url": "/api-keys/k1",
+      "body": {
+        "is_active": false
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    },
+    {
+      "method": "PATCH",
+      "url": "/api-keys/k3",
+      "body": {
+        "is_active": true
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Connexion désactivée",
+      "description": "La clé API ne sera plus utilisée pour les synchronisations."
+    },
+    {
+      "title": "Connexion activée",
+      "description": "La clé API sera de nouveau utilisée pour les synchronisations."
+    }
+  ]
+}

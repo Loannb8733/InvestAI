@@ -1,0 +1,21 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/cold-wallets"
+    },
+    {
+      "method": "DELETE",
+      "url": "/cold-wallets/w1"
+    },
+    {
+      "method": "GET",
+      "url": "/cold-wallets"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Cold wallet supprimé"
+    }
+  ]
+}

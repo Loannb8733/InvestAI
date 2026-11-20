@@ -1,0 +1,31 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/transactions/balance-gaps",
+      "params": {
+        "threshold_eur": 5
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/transactions/balance-gaps/credit-all",
+      "params": {
+        "threshold_eur": 5
+      },
+      "body": null
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur lors du crédit auto",
+      "description": "Request failed with status code 500"
+    }
+  ]
+}

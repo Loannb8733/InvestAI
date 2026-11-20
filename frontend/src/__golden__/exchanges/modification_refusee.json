@@ -1,0 +1,14 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "Base indisponible",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Base indisponible"
+    }
+  ]
+}

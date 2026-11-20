@@ -1,0 +1,124 @@
+{
+  "gaps": [
+    "Réconciliation",
+    "Compare les soldes rapportés par vos exchanges avec vos transactions importées pour détecter les récompenses non tracées (intérêts Earn, airdrops, vouchers...).",
+    "Vérifier les écarts",
+    "Dernière vérification :",
+    "2 sept. 2026, 12:00",
+    "4",
+    "récompense(s) non tracée(s) détectée(s) — total estimé",
+    "1330.02",
+    "€.",
+    "Actif",
+    "Exchange",
+    "Écart de quantité",
+    "Valorisation estimée",
+    "Origine probable",
+    "BNB",
+    "Binance",
+    "+",
+    "0.265500",
+    "142.37",
+    "€",
+    "Intérêts Earn",
+    "ARB",
+    "Binance",
+    "+",
+    "40.0000",
+    "31.20",
+    "€",
+    "Airdrop",
+    "DOT",
+    "Kraken",
+    "+",
+    "4.12e-6",
+    "6.05",
+    "€",
+    "Inconnue",
+    "USDC",
+    "Kraken",
+    "+",
+    "1 250",
+    "1150.40",
+    "€",
+    "Intérêts Earn",
+    "Créditer en airdrop",
+    "Le crédit auto valorise au prix du jour — pour des revenus perçus antérieurement, la base fiscale exacte est le prix au jour de perception."
+  ],
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/transactions/balance-gaps",
+      "params": {
+        "threshold_eur": 5
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/transactions/balance-gaps/credit-all",
+      "params": {
+        "threshold_eur": 5
+      },
+      "body": null
+    },
+    {
+      "method": "GET",
+      "url": "/transactions/balance-gaps",
+      "params": {
+        "threshold_eur": 5
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "3 récompense(s) créditée(s) en AIRDROP",
+      "description": "1 ignorée(s) (déjà créditées ou prix marché manquant)."
+    }
+  ],
+  "panel": [
+    "Réconciliation",
+    "Compare les soldes rapportés par vos exchanges avec vos transactions importées pour détecter les récompenses non tracées (intérêts Earn, airdrops, vouchers...).",
+    "Vérifier les écarts",
+    "Dernière vérification :",
+    "2 sept. 2026, 12:00",
+    "4",
+    "récompense(s) non tracée(s) détectée(s) — total estimé",
+    "1330.02",
+    "€.",
+    "Actif",
+    "Exchange",
+    "Écart de quantité",
+    "Valorisation estimée",
+    "Origine probable",
+    "BNB",
+    "Binance",
+    "+",
+    "0.265500",
+    "142.37",
+    "€",
+    "Intérêts Earn",
+    "ARB",
+    "Binance",
+    "+",
+    "40.0000",
+    "31.20",
+    "€",
+    "Airdrop",
+    "DOT",
+    "Kraken",
+    "+",
+    "4.12e-6",
+    "6.05",
+    "€",
+    "Inconnue",
+    "USDC",
+    "Kraken",
+    "+",
+    "1 250",
+    "1150.40",
+    "€",
+    "Intérêts Earn",
+    "Créditer en airdrop",
+    "Le crédit auto valorise au prix du jour — pour des revenus perçus antérieurement, la base fiscale exacte est le prix au jour de perception."
+  ]
+}

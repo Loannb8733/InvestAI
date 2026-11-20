@@ -1,0 +1,20 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/api-keys/k1/import-async"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "File Celery pleine",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur d'import",
+      "description": "File Celery pleine"
+    }
+  ]
+}

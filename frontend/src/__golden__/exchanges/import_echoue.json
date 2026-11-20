@@ -1,0 +1,23 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/api-keys/k1/import-async"
+    },
+    {
+      "method": "GET",
+      "url": "/api-keys/import-status/task-import"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Import lancé",
+      "description": "L'import tourne en arrière-plan. Cela peut prendre quelques minutes."
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur d'import",
+      "description": "Binance a refusé la signature"
+    }
+  ]
+}

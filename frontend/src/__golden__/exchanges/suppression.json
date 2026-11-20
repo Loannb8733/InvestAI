@@ -1,0 +1,31 @@
+{
+  "dialog": [
+    "Supprimer cette connexion ?",
+    "Vous êtes sur le point de supprimer la connexion à",
+    "Binance",
+    ".",
+    "Vos données importées (transactions, actifs) resteront dans l'application. Vous pourrez reconnecter cet exchange à tout moment.",
+    "Annuler",
+    "Supprimer"
+  ],
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    },
+    {
+      "method": "DELETE",
+      "url": "/api-keys/k2"
+    },
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Clé API supprimée",
+      "description": "La connexion a été supprimée avec succès."
+    }
+  ]
+}
