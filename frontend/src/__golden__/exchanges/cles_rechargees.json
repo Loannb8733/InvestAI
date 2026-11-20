@@ -1,0 +1,32 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/api-keys/exchanges"
+    },
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    },
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    },
+    {
+      "method": "GET",
+      "url": "/cold-wallets"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    }
+  ]
+}

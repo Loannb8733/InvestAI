@@ -1,0 +1,22 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    },
+    {
+      "method": "POST",
+      "url": "/api-keys/k1/sync"
+    },
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Synchronisation réussie",
+      "description": "3 actif(s) synchronisé(s)."
+    }
+  ]
+}

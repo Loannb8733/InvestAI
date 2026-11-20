@@ -1,0 +1,11 @@
+{
+  "dialog": [
+    "Bitget",
+    "Le guide pour cet exchange n'est pas encore disponible.",
+    "En général, rendez-vous dans les paramètres de sécurité/API de votre exchange et créez une clé en",
+    "lecture seule",
+    ".",
+    "Fermer",
+    "Fermer"
+  ]
+}

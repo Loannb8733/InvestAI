@@ -1,0 +1,14 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "Binance indisponible",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de synchronisation",
+      "description": "Binance indisponible"
+    }
+  ]
+}

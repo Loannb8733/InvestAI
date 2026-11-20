@@ -1,0 +1,57 @@
+{
+  "disabledBeforeChoice": true,
+  "form": [
+    "Connecter un exchange",
+    "Entrez vos clés API pour connecter votre exchange. Utilisez des clés en lecture seule pour plus de sécurité.",
+    "Exchange",
+    "OKX",
+    "Binance",
+    "Bitpanda",
+    "Bitstamp",
+    "Bybit",
+    "Coinbase",
+    "Crypto.com",
+    "Gate.io",
+    "Kraken",
+    "KuCoin",
+    "OKX",
+    "Label (optionnel)",
+    "Utile si vous avez plusieurs comptes sur le même exchange.",
+    "Clé API",
+    "Clé secrète",
+    "Passphrase",
+    "Conseil sécurité:",
+    "Créez des clés API en lecture seule sans permission de retrait pour protéger vos fonds.",
+    "Annuler",
+    "Connecter",
+    "Fermer"
+  ],
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    },
+    {
+      "method": "POST",
+      "url": "/api-keys",
+      "body": {
+        "exchange": "okx",
+        "label": "Trading",
+        "api_key": "okx-key",
+        "secret_key": "okx-secret",
+        "passphrase": "okx-pass"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Clé API ajoutée",
+      "description": "La clé API a été enregistrée avec succès."
+    }
+  ],
+  "dialog": false
+}

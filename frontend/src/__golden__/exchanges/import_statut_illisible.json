@@ -1,0 +1,28 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/api-keys/k1/import-async"
+    },
+    {
+      "method": "GET",
+      "url": "/api-keys/import-status/task-import"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Import lancé",
+      "description": "L'import tourne en arrière-plan. Cela peut prendre quelques minutes."
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Impossible de vérifier le statut de l'opération."
+    }
+  ]
+}

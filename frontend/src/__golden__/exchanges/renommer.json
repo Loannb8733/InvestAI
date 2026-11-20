@@ -1,0 +1,37 @@
+{
+  "dialog": [
+    "Renommer la connexion",
+    "Modifiez le label de votre connexion",
+    "Binance",
+    ".",
+    "Label",
+    "Utile si vous avez plusieurs comptes sur le même exchange.",
+    "Annuler",
+    "Enregistrer",
+    "Fermer"
+  ],
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    },
+    {
+      "method": "PATCH",
+      "url": "/api-keys/k1",
+      "body": {
+        "label": "Compte DCA"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Label mis à jour",
+      "description": "La connexion a été renommée avec succès."
+    }
+  ],
+  "open": false
+}

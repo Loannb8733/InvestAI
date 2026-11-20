@@ -1,0 +1,41 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    },
+    {
+      "method": "POST",
+      "url": "/api-keys/k1/test"
+    },
+    {
+      "method": "GET",
+      "url": "/api-keys"
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Connexion réussie",
+      "description": "Connexion à Binance réussie"
+    }
+  ],
+  "dialog": [
+    "Connexion réussie",
+    "Connexion à Binance réussie",
+    "Soldes détectés (",
+    "5",
+    "actifs)",
+    "SHIB",
+    "1 520 000",
+    "ETH",
+    "2.5000",
+    "BNB",
+    "1.5000",
+    "BTC",
+    "0.512346",
+    "PEPE",
+    "4.00e-6",
+    "Fermer",
+    "Fermer"
+  ]
+}

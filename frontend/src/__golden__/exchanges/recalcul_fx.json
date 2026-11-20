@@ -1,0 +1,38 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/api-keys/k1/refresh-fx"
+    },
+    {
+      "method": "GET",
+      "url": "/api-keys/import-status/task-fx"
+    },
+    {
+      "method": "GET",
+      "url": "/transactions/balance-gaps",
+      "params": {
+        "threshold_eur": 5
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Recalcul lancé",
+      "description": "Les taux de change historiques sont recalculés en arrière-plan."
+    },
+    {
+      "title": "Recalcul terminé",
+      "description": "Aucune correction nécessaire"
+    }
+  ],
+  "panel": [
+    "Réconciliation",
+    "Compare les soldes rapportés par vos exchanges avec vos transactions importées pour détecter les récompenses non tracées (intérêts Earn, airdrops, vouchers...).",
+    "Vérifier les écarts",
+    "Dernière vérification :",
+    "2 sept. 2026, 12:00",
+    "Aucun écart détecté ✓",
+    "Le crédit auto valorise au prix du jour — pour des revenus perçus antérieurement, la base fiscale exacte est le prix au jour de perception."
+  ]
+}

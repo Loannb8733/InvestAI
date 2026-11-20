@@ -1,0 +1,15 @@
+{
+  "toasts": [
+    {
+      "variant": "destructive",
+      "title": "Échec de connexion",
+      "description": "Signature invalide"
+    }
+  ],
+  "dialog": [
+    "Échec de connexion",
+    "Signature invalide",
+    "Fermer",
+    "Fermer"
+  ]
+}

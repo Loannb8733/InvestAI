@@ -1,0 +1,21 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Impossible de vérifier les écarts de solde."
+    }
+  ],
+  "panel": [
+    "Réconciliation",
+    "Compare les soldes rapportés par vos exchanges avec vos transactions importées pour détecter les récompenses non tracées (intérêts Earn, airdrops, vouchers...).",
+    "Vérifier les écarts",
+    "Cliquez sur « Vérifier les écarts » pour lancer une comparaison. Une vérification est aussi effectuée automatiquement après chaque import d'historique.",
+    "Le crédit auto valorise au prix du jour — pour des revenus perçus antérieurement, la base fiscale exacte est le prix au jour de perception."
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur",
+      "description": "Impossible de supprimer la clé API."
+    }
+  ]
+}
