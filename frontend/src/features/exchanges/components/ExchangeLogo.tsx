@@ -1,16 +1,5 @@
-/**
- * ExchangeLogo — le logo d'une plateforme, avec repli lisible.
- *
- * Extrait de `ExchangesPage.tsx` (ARC-07). Purement présentationnel : aucune prop
- * d'état, aucun effet — donc extractible sans risque, contrairement au reste de la
- * page qui partage 28 hooks.
- *
- * Quand aucun logo n'est disponible, on affiche des initiales sur fond coloré
- * plutôt qu'une image cassée : une plateforme non illustrée reste identifiable.
- */
 import { Coins } from 'lucide-react'
 
-// Exchange logos — static lookups hoisted outside the component to avoid re-creation per render
 const LOGO_URLS: Record<string, string> = {
   binance: '/logos/binance.png',
   kraken: '/logos/kraken.png',
@@ -50,16 +39,10 @@ const FALLBACK_LABELS: Record<string, string> = {
   gateio: 'GT',
 }
 
-const ExchangeLogo = ({ exchange, size = 40 }: { exchange: string; size?: number }) => {
+export default function ExchangeLogo({ exchange, size = 40 }: { exchange: string; size?: number }) {
   if (LOGO_URLS[exchange]) {
     return (
-      <img
-        src={LOGO_URLS[exchange]}
-        alt={exchange}
-        width={size}
-        height={size}
-        className="shrink-0 rounded-lg"
-      />
+      <img src={LOGO_URLS[exchange]} alt={exchange} width={size} height={size} className="shrink-0 rounded-lg" />
     )
   }
 
@@ -72,5 +55,3 @@ const ExchangeLogo = ({ exchange, size = 40 }: { exchange: string; size?: number
     </div>
   )
 }
-
-export default ExchangeLogo

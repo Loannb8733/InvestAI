@@ -7,9 +7,8 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { CheckCircle, Copy, ExternalLink, Plus, ShieldCheck, XCircle } from 'lucide-react'
-import type { ExchangeGuideData } from './exchange-guides'
+import type { ExchangeGuideData } from '../guides/types'
 
-/** Rend les segments **gras** d'un texte de guide en <strong>. */
 const BoldText = ({ text }: { text: string }) => (
   <>
     {text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
@@ -24,18 +23,11 @@ const BoldText = ({ text }: { text: string }) => (
 
 interface ExchangeGuideProps {
   guide: ExchangeGuideData
-  /** Logo de l'exchange affiché dans le titre (fourni par la page). */
   logo?: ReactNode
   onClose: () => void
   onConnect: () => void
 }
 
-/**
- * Guide de création de clé API pour un exchange, rendu depuis la structure
- * de données `ExchangeGuideData` (voir exchange-guides.ts). S'affiche dans
- * le corps d'un <DialogContent> : encadré « lecture seule », étapes
- * numérotées, permissions à cocher / interdites, clés à copier.
- */
 export default function ExchangeGuide({ guide, logo, onClose, onConnect }: ExchangeGuideProps) {
   return (
     <>

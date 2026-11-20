@@ -19,13 +19,6 @@ comments	frontend/src/components/dashboard/DashboardMetricsRow.tsx
 comments	frontend/src/components/dashboard/DashboardMunitionsCard.tsx
 comments	frontend/src/components/dashboard/DashboardPnlCard.tsx
 comments	frontend/src/components/dashboard/IASummaryWidget.tsx
-comments	frontend/src/components/exchanges/ColdWalletsManager.tsx
-comments	frontend/src/components/exchanges/DeleteConnectionDialog.tsx
-comments	frontend/src/components/exchanges/ExchangeGuide.tsx
-comments	frontend/src/components/exchanges/TestResultDialog.tsx
-comments	frontend/src/components/exchanges/exchange-guides.ts
-comments	frontend/src/components/exchanges/exchange-logo.tsx
-comments	frontend/src/components/exchanges/format-balance.ts
 comments	frontend/src/components/intelligence/DecisionsPillar.tsx
 comments	frontend/src/components/intelligence/MarketSignalsPillar.tsx
 comments	frontend/src/components/intelligence/RegimeHeader.tsx
@@ -100,7 +93,6 @@ comments	frontend/src/pages/CrowdfundingMesProjectsPage.tsx
 comments	frontend/src/pages/CrowdfundingPerformancePage.tsx
 comments	frontend/src/pages/CrowdfundingProjectsPage.tsx
 comments	frontend/src/pages/DashboardPage.tsx
-comments	frontend/src/pages/ExchangesPage.tsx
 comments	frontend/src/pages/GoalsPage.tsx
 comments	frontend/src/pages/IntelligencePage.tsx
 comments	frontend/src/pages/MasterDashboardPage.tsx
@@ -112,14 +104,12 @@ comments	frontend/src/services/api.ts
 comments	frontend/src/setupTests.ts
 comments	frontend/src/types/crowdfunding.ts
 comments	frontend/src/types/dashboard.ts
-comments	frontend/src/types/exchanges.ts
 comments	frontend/src/types/index.ts
 comments	frontend/src/types/predictions.ts
 comments	frontend/src/types/simulations.ts
 too-long	backend/app/core/redis_client.py
 too-long	frontend/src/components/crowdfunding/PaymentTimeline.tsx
 too-long	frontend/src/components/dashboard/IASummaryWidget.tsx
-too-long	frontend/src/components/exchanges/exchange-guides.ts
 too-long	frontend/src/components/intelligence/RiskPerformancePillar.tsx
 too-long	frontend/src/components/intelligence/decisions/StrategiesSection.tsx
 too-long	frontend/src/components/intelligence/market/AlphaSignalsSection.tsx
@@ -140,7 +130,6 @@ too-long	frontend/src/pages/CrowdfundingDashboardPage.tsx
 too-long	frontend/src/pages/CrowdfundingPerformancePage.tsx
 too-long	frontend/src/pages/CrowdfundingProjectsPage.tsx
 too-long	frontend/src/pages/DashboardPage.tsx
-too-long	frontend/src/pages/ExchangesPage.tsx
 too-long	frontend/src/pages/GoalsPage.tsx
 too-long	frontend/src/pages/MasterDashboardPage.tsx
 too-long	frontend/src/pages/ReportsPage.tsx
