@@ -1,0 +1,41 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    }
+  ],
+  "markowitz": [
+    "Optimisation & rééquilibrage",
+    "Deux moteurs indépendants : Markowitz optimise les poids à partir des rendements de la période d'analyse, tandis que le moteur MPT de Smart Insights part du diagnostic de santé — fenêtres et contraintes différentes, leurs cibles peuvent donc diverger.",
+    "Markowitz (",
+    "max Sharpe",
+    ")",
+    "Portefeuille maximisant le Sharpe ratio",
+    "Objectif",
+    "Sharpe max",
+    "AAPL",
+    "88.7",
+    "%",
+    "+",
+    "82.5",
+    "%",
+    "BTC",
+    "11.3",
+    "%",
+    "-55.7",
+    "%",
+    "+",
+    "41.6",
+    "%",
+    "Rendement espéré",
+    "0.4",
+    "%",
+    "Volatilité",
+    "102.95",
+    "Sharpe optimal",
+    "Générer les ordres de rééquilibrage",
+    "Impossible de générer les ordres de rééquilibrage. Veuillez réessayer."
+  ]
+}

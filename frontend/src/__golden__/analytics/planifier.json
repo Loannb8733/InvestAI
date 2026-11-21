@@ -1,0 +1,64 @@
+{
+  "calls": [
+    {
+      "method": "POST",
+      "url": "/predictions/planned-orders",
+      "body": {
+        "symbol": "AAPL",
+        "side": "buy",
+        "amount_eur": 5431.25,
+        "notes": "Rééquilibrage MPT (Smart Insights)",
+        "source": "frontend"
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Ordre planifié",
+      "description": "AAPL — visible dans Signaux Alpha."
+    }
+  ],
+  "mpt": [
+    "MPT Smart Insights",
+    "Ordres suggérés pour optimiser le ratio de Sharpe (MPT) — planifiables dans Signaux Alpha",
+    "Actif",
+    "Action",
+    "Poids actuel",
+    "Poids cible",
+    "Montant",
+    "Raison",
+    "Planifier",
+    "BTC",
+    "BTC",
+    "Prendre profits",
+    "60.3",
+    "%",
+    "40.0",
+    "%",
+    "-",
+    "12 780,50 €",
+    "Rapprocher BTC de sa cible MPT",
+    "Planifier",
+    "AAPL",
+    "AAPL",
+    "Acheter",
+    "6.4",
+    "%",
+    "15.0",
+    "%",
+    "+",
+    "5 431,25 €",
+    "Rapprocher AAPL de sa cible MPT",
+    "Planifié ✓",
+    "ETH",
+    "ETH",
+    "Conserver",
+    "15.6",
+    "%",
+    "16.0",
+    "%",
+    "~",
+    "240,00 €",
+    "Rapprocher ETH de sa cible MPT"
+  ]
+}

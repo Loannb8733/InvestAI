@@ -1,0 +1,11 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/smart-insights/health",
+      "params": {
+        "days": 30
+      }
+    }
+  ]
+}

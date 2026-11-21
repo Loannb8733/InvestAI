@@ -1,0 +1,55 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/analytics",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/diversification",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/correlation",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/performance",
+      "params": {
+        "period": "30d"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/historical-data",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/smart-insights/health",
+      "params": {
+        "days": 30
+      }
+    }
+  ],
+  "toasts": [],
+  "text": [
+    "Aucune donnée à analyser",
+    "Ajoutez des actifs à vos portefeuilles pour voir le risque et la performance."
+  ]
+}

@@ -1,0 +1,458 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/analytics",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/diversification",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/correlation",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/performance",
+      "params": {
+        "period": "30d"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/historical-data",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/smart-insights/health",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/monte-carlo",
+      "params": {
+        "horizon": 90
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/xirr"
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/optimize",
+      "params": {
+        "objective": "max_sharpe",
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/stress-test"
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/beta",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/diversification",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/correlation",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/performance",
+      "params": {
+        "period": "30d"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/monte-carlo",
+      "params": {
+        "horizon": 90
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/xirr"
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/optimize",
+      "params": {
+        "objective": "max_sharpe",
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/stress-test"
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/beta",
+      "params": {
+        "days": 30
+      }
+    }
+  ],
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "variant": "destructive",
+      "title": "Erreur de chargement",
+      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
+    }
+  ],
+  "text": [
+    "Période et portefeuille communs à tout le pilier — score, métriques et optimisations parlent de la même fenêtre.",
+    "Tous les portefeuilles",
+    "30 jours",
+    "CSV",
+    "Score de santé (",
+    "30",
+    "j)",
+    "35",
+    "/100",
+    "poor",
+    "Recommandations IA",
+    "Ce qui pèse sur le score — et le gain potentiel de chaque action",
+    "Performance très faible",
+    "performance",
+    "Votre ratio de Sharpe (-3.54) est négatif. Votre portfolio sous-performe un placement sans risque.",
+    "Actuel:",
+    "-3.54",
+    "Objectif:",
+    "1.00",
+    "Diversifiez vers des actifs moins corrélés ou réduisez les positions perdantes.",
+    "Concentration excessive",
+    "diversification",
+    "BTC représente 60% de votre portfolio. C'est trop concentré.",
+    "Actuel:",
+    "0.60",
+    "Objectif:",
+    "0.25",
+    "Réduisez BTC à max 25% et diversifiez.",
+    "PRENDRE PROFITS",
+    "BTC",
+    "Portfolio peu diversifié",
+    "diversification",
+    "Votre indice HHI (0.41) indique une concentration élevée.",
+    "Actuel:",
+    "40.8%",
+    "Objectif:",
+    "15.0%",
+    "Ajoutez des actifs décorrélés (actions, ETF, or).",
+    "Anomalie détectée sur BTC",
+    "anomaly",
+    "Mouvement anormal détecté par Isolation Forest: hausse de 4.4% (score anomalie: -0.00). Impact: +1,658€ (+4.4%)",
+    "Anomalie détectée sur ETH",
+    "anomaly",
+    "Mouvement anormal détecté par Isolation Forest: baisse de 6.6% (score anomalie: -0.09). Impact: -650€ (-6.6%)",
+    "Anomalie détectée sur UNI",
+    "anomaly",
+    "Mouvement anormal détecté par Isolation Forest: hausse de 33.4% (score anomalie: -0.08). Impact: +459€ (+33.4%)",
+    "Anomalie détectée sur DOGE",
+    "anomaly",
+    "Mouvement anormal détecté par Isolation Forest: hausse de 37.7% (score anomalie: -0.10). Impact: +415€ (+37.7%)",
+    "Anomalie détectée sur SOL",
+    "anomaly",
+    "Mouvement anormal détecté par Isolation Forest: baisse de 1.4% (score anomalie: -0.02). Impact: -109€ (-1.4%)",
+    "Anomalie détectée sur ARB",
+    "anomaly",
+    "Mouvement anormal détecté par Isolation Forest: baisse de 4.0% (score anomalie: -0.08). Impact: -37€ (-4.0%)",
+    "Anomalie détectée sur AAPL",
+    "anomaly",
+    "Mouvement anormal détecté par Isolation Forest: baisse de 0.2% (score anomalie: -0.06). Impact: -8€ (-0.2%)",
+    "Cluster de risque détecté",
+    "risk",
+    "Les actifs BTC, UNI forment un cluster (corrélation moyenne : 100%). En cas de chute, ils baisseront simultanément.",
+    "Cluster de risque détecté",
+    "risk",
+    "Les actifs AAPL, SOL forment un cluster (corrélation moyenne : 100%). En cas de chute, ils baisseront simultanément.",
+    "Cluster de risque détecté",
+    "risk",
+    "Les actifs ARB, ETH forment un cluster (corrélation moyenne : 98%). En cas de chute, ils baisseront simultanément.",
+    "Marche haussier",
+    "opportunity",
+    "Le marche est en tendance haussiere (61%). Conditions favorables pour vos positions. Preparez vos niveaux de prise de profits.",
+    "Or : couverture naturelle active",
+    "diversification",
+    "L'or (PAXG/XAU) affiche une correlation moyenne de -76% avec vos positions, confirmant son role de couverture. En regime baissier, cette decorrelation stabilise la volatilite globale de votre portefeuille.",
+    "Volatilité",
+    "3.1",
+    "%",
+    "Faible",
+    "Sharpe",
+    "-2.83",
+    "Faible",
+    "Rendement inférieur au taux sans risque. Le portefeuille ne compense pas sa volatilité.",
+    "Sortino",
+    "Crypto",
+    "-2.70",
+    "Ne punit pas les hausses explosives",
+    "Sortino négatif : les pertes dominent. Le risque baissier dépasse le rendement.",
+    "Diversification",
+    "—",
+    "/100",
+    "VaR 95%",
+    "141,61 €",
+    "Perte journalière maximale attendue (95%): 141.61 EUR (0.22% du portefeuille)",
+    "CVaR (ES)",
+    "160,92 €",
+    "Expected Shortfall",
+    "Max Drawdown",
+    "-2.4",
+    "%",
+    "Calmar:",
+    "-0.85",
+    "Le portefeuille n'a pas récupéré de sa plus grosse perte.",
+    "XIRR",
+    "—",
+    "Pas assez de données",
+    "Clusters de Risque",
+    "BTC",
+    "UNI",
+    "100",
+    "%",
+    "corrélation",
+    "AAPL",
+    "SOL",
+    "100",
+    "%",
+    "corrélation",
+    "ARB",
+    "ETH",
+    "98",
+    "%",
+    "corrélation",
+    "Ces actifs bougent ensemble (corrélation > 85%). En cas de chute, ils baisseront simultanément. La matrice de corrélation complète est affichée plus bas dans ce pilier.",
+    "Impact Flash Crash",
+    "Simulation de perte immédiate basée sur les anomalies détectées",
+    "Perte simulée",
+    "803,95 €",
+    "soit",
+    "1.3",
+    "% de",
+    "62 932,46 €",
+    "ETH",
+    "price_drop",
+    "-649,77 €",
+    "SOL",
+    "price_drop",
+    "-109,40 €",
+    "ARB",
+    "price_drop",
+    "-36,76 €",
+    "AAPL",
+    "price_drop",
+    "-8,02 €",
+    "Optimisation & rééquilibrage",
+    "Deux moteurs indépendants : Markowitz optimise les poids à partir des rendements de la période d'analyse, tandis que le moteur MPT de Smart Insights part du diagnostic de santé — fenêtres et contraintes différentes, leurs cibles peuvent donc diverger.",
+    "MPT Smart Insights",
+    "Ordres suggérés pour optimiser le ratio de Sharpe (MPT) — planifiables dans Signaux Alpha",
+    "Actif",
+    "Action",
+    "Poids actuel",
+    "Poids cible",
+    "Montant",
+    "Raison",
+    "Planifier",
+    "BTC",
+    "BTC",
+    "Prendre profits",
+    "60.3",
+    "%",
+    "40.0",
+    "%",
+    "-",
+    "12 780,50 €",
+    "Rapprocher BTC de sa cible MPT",
+    "Planifier",
+    "AAPL",
+    "AAPL",
+    "Acheter",
+    "6.4",
+    "%",
+    "15.0",
+    "%",
+    "+",
+    "5 431,25 €",
+    "Rapprocher AAPL de sa cible MPT",
+    "Planifier",
+    "ETH",
+    "ETH",
+    "Conserver",
+    "15.6",
+    "%",
+    "16.0",
+    "%",
+    "~",
+    "240,00 €",
+    "Rapprocher ETH de sa cible MPT",
+    "Répartition par classe d'actifs",
+    "Profil de risque",
+    "Performance par actif",
+    "Gains/pertes en pourcentage (top 10)",
+    "Top 10 positions",
+    "Répartition par actif",
+    "Analyse de santé générée le",
+    "17/10/2026 12:00:00"
+  ]
+}
