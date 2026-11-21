@@ -1,0 +1,114 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/portfolios"
+    },
+    {
+      "method": "GET",
+      "url": "/analytics",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/diversification",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/correlation",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/performance",
+      "params": {
+        "period": "30d"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/dashboard/historical-data",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/smart-insights/health",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/monte-carlo",
+      "params": {
+        "horizon": 90
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/xirr"
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/stress-test"
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/beta",
+      "params": {
+        "days": 30
+      }
+    }
+  ],
+  "optimization": [
+    "Optimisation & rééquilibrage",
+    "Deux moteurs indépendants : Markowitz optimise les poids à partir des rendements de la période d'analyse, tandis que le moteur MPT de Smart Insights part du diagnostic de santé — fenêtres et contraintes différentes, leurs cibles peuvent donc diverger.",
+    "Markowitz (max Sharpe)",
+    "L'optimisation Markowitz nécessite au moins 2 actifs dans le portefeuille.",
+    "MPT Smart Insights",
+    "Ordres suggérés pour optimiser le ratio de Sharpe (MPT) — planifiables dans Signaux Alpha",
+    "Actif",
+    "Action",
+    "Poids actuel",
+    "Poids cible",
+    "Montant",
+    "Raison",
+    "Planifier",
+    "BTC",
+    "BTC",
+    "Prendre profits",
+    "60.3",
+    "%",
+    "40.0",
+    "%",
+    "-",
+    "12 780,50 €",
+    "Rapprocher BTC de sa cible MPT",
+    "Planifier",
+    "AAPL",
+    "AAPL",
+    "Acheter",
+    "6.4",
+    "%",
+    "15.0",
+    "%",
+    "+",
+    "5 431,25 €",
+    "Rapprocher AAPL de sa cible MPT",
+    "Planifier",
+    "ETH",
+    "ETH",
+    "Conserver",
+    "15.6",
+    "%"
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "options": [
+    "Tous les portefeuilles",
+    "Crypto",
+    "Bourse",
+    "Mes prêts"
+  ],
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/analytics/portfolio/p1",
+      "params": {
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/diversification",
+      "params": {
+        "portfolio_id": "p1",
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/correlation",
+      "params": {
+        "portfolio_id": "p1",
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/performance",
+      "params": {
+        "period": "30d",
+        "portfolio_id": "p1"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/monte-carlo",
+      "params": {
+        "horizon": 90,
+        "portfolio_id": "p1"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/xirr",
+      "params": {
+        "portfolio_id": "p1"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/optimize",
+      "params": {
+        "objective": "max_sharpe",
+        "days": 30
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/stress-test",
+      "params": {
+        "portfolio_id": "p1"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "/analytics/beta",
+      "params": {
+        "days": 30,
+        "portfolio_id": "p1"
+      }
+    }
+  ]
+}

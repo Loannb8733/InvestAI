@@ -1,0 +1,37 @@
+{
+  "toasts": [
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    },
+    {
+      "title": "Erreur serveur",
+      "description": "boom",
+      "variant": "destructive"
+    }
+  ],
+  "section": [
+    "Période et portefeuille communs à tout le pilier — score, métriques et optimisations parlent de la même fenêtre.",
+    "Tous les portefeuilles",
+    "30 jours",
+    "CSV",
+    "Erreur lors du chargement du score de santé",
+    "Réessayer",
+    "Volatilité",
+    "3.1",
+    "%",
+    "Faible",
+    "Sharpe",
+    "-2.83"
+  ],
+  "retry": [
+    {
+      "method": "GET",
+      "url": "/smart-insights/health",
+      "params": {
+        "days": 30
+      }
+    }
+  ]
+}

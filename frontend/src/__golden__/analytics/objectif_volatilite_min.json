@@ -1,0 +1,43 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/analytics/optimize",
+      "params": {
+        "objective": "min_volatility",
+        "days": 30
+      }
+    }
+  ],
+  "markowitz": [
+    "Optimisation & rééquilibrage",
+    "Deux moteurs indépendants : Markowitz optimise les poids à partir des rendements de la période d'analyse, tandis que le moteur MPT de Smart Insights part du diagnostic de santé — fenêtres et contraintes différentes, leurs cibles peuvent donc diverger.",
+    "Markowitz (",
+    "volatilité min",
+    ")",
+    "Portefeuille minimisant la volatilité",
+    "Objectif",
+    "Volatilité min",
+    "AAPL",
+    "73.1",
+    "%",
+    "+",
+    "66.8",
+    "%",
+    "BTC",
+    "26.9",
+    "%",
+    "-40.0",
+    "%",
+    "+",
+    "19.9",
+    "%",
+    "Rendement espéré",
+    "0.8",
+    "%",
+    "Volatilité",
+    "21.71",
+    "Sharpe optimal",
+    "Générer les ordres de rééquilibrage"
+  ]
+}

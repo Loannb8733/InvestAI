@@ -1,0 +1,11 @@
+{
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/analytics/monte-carlo",
+      "params": {
+        "horizon": 365
+      }
+    }
+  ]
+}

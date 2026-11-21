@@ -1,0 +1,14 @@
+{
+  "calls": [],
+  "downloads": [
+    "analyse-portefeuille-2026-10-17.csv"
+  ],
+  "type": "text/csv;charset=utf-8",
+  "lines": [
+    "Actif,Type,Valeur (EUR),Performance %,Poids %,Volatilité,Sharpe,Sortino,Max Drawdown,Rendement J",
+    "BTC,crypto,43115.70,56.70,66.98,4.20,-5.41,-5.69,-5.73,0.38",
+    "ETH,crypto,9637.31,60.54,14.97,9.10,0.26,0.31,-7.75,0.59",
+    "SOL,crypto,7607.02,52.08,11.82,13.50,0.11,0.12,-8.42,-0.96",
+    "AAPL,stock,4007.97,17.85,6.23,0.60,58.81,0.00,0.00,0.05"
+  ]
+}
