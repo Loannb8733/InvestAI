@@ -11,6 +11,7 @@ from app.domains.analytics.platforms import platform_distribution
 from app.domains.analytics.results import AssetPerformance, PortfolioAnalytics
 from app.domains.analytics.ruin_alert import send_ruin_alert
 from app.domains.analytics.schemas import (
+    BetaResponse,
     CorrelationResponse,
     DiversificationResponse,
     MonteCarloResponse,
@@ -18,6 +19,7 @@ from app.domains.analytics.schemas import (
     PerformanceSummaryResponse,
     PlatformDistributionItem,
     PortfolioAnalyticsResponse,
+    PortfolioStressTestResponse,
     RebalanceOrderResponse,
     RebalanceResponse,
     RecommendationResponse,
@@ -148,7 +150,7 @@ async def get_performance_summary(
     return _performance_summary(period, analytics)
 
 
-@router.get("/stress-test", response_model=dict)
+@router.get("/stress-test", response_model=PortfolioStressTestResponse)
 async def get_stress_test(
     user: CurrentUser,
     session: Session,
@@ -163,7 +165,7 @@ async def get_stress_test(
     )
 
 
-@router.get("/beta", response_model=dict)
+@router.get("/beta", response_model=BetaResponse, response_model_exclude_unset=True)
 async def get_beta(
     user: CurrentUser,
     session: Session,

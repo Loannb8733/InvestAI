@@ -14,15 +14,7 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react'
-import type { BetaData, Diversification, PerformanceSummary } from './types'
-
-/**
- * Compléments Analytics conservés dans le pilier : Beta vs Benchmark,
- * recommandations de diversification, meilleurs/pires performers.
- * Copiés d'AnalyticsPage (mêmes données, mêmes seuils).
- */
-
-// ── Beta vs Benchmark ─────────────────────────────────────────────────
+import type { BetaData, Diversification, PerformanceSummary } from '../types'
 
 interface BetaCardProps {
   betaData: BetaData
@@ -49,7 +41,7 @@ export function BetaCard({ betaData, betaDays, periodDays }: BetaCardProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {/* Betas de portefeuille */}
+
           <div className="grid grid-cols-2 gap-3 pb-3 border-b">
             {betaData.portfolio_beta_crypto != null && (
               <div className="text-center">
@@ -69,7 +61,6 @@ export function BetaCard({ betaData, betaDays, periodDays }: BetaCardProps) {
             )}
           </div>
 
-          {/* Betas par actif */}
           <div className="space-y-2">
             {betaData.assets.slice(0, 8).map((asset) => (
               <div key={asset.symbol} className="flex items-center gap-2">
@@ -77,7 +68,7 @@ export function BetaCard({ betaData, betaDays, periodDays }: BetaCardProps) {
                 <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden relative">
                   {asset.beta != null && (
                     <>
-                      {/* Ligne de référence à beta = 1 */}
+
                       <div className="absolute left-1/2 top-0 bottom-0 w-px bg-foreground/20" />
                       <div
                         className={`h-full rounded-full absolute ${asset.beta > 1 ? 'bg-loss' : asset.beta > 0.5 ? 'bg-warning' : 'bg-gain'}`}
@@ -112,8 +103,6 @@ export function BetaCard({ betaData, betaDays, periodDays }: BetaCardProps) {
     </Card>
   )
 }
-
-// ── Recommandations de diversification ────────────────────────────────
 
 const getSeverityColor = (severity: string) => {
   switch (severity) {
@@ -165,8 +154,6 @@ export function DiversificationRecommendations({ diversification }: Diversificat
   )
 }
 
-// ── Meilleurs / pires performers ──────────────────────────────────────
-
 interface TopWorstPerformersProps {
   performance: PerformanceSummary
 }
@@ -187,7 +174,7 @@ export function TopWorstPerformers({ performance }: TopWorstPerformersProps) {
               {performance.top_gainers.map((item) => (
                 <div key={item.symbol} className="flex items-center justify-between">
                   <AssetIconCompact symbol={item.symbol} name={item.name} assetType={item.asset_type} size={36} />
-                  <span className="text-gain font-medium">+{item.gain_loss_percent.toFixed(2)}%</span>
+                  <span className="text-gain font-medium">+{(item.gain_loss_percent ?? 0).toFixed(2)}%</span>
                 </div>
               ))}
             </div>
@@ -210,7 +197,7 @@ export function TopWorstPerformers({ performance }: TopWorstPerformersProps) {
               {performance.top_losers.map((item) => (
                 <div key={item.symbol} className="flex items-center justify-between">
                   <AssetIconCompact symbol={item.symbol} name={item.name} assetType={item.asset_type} size={36} />
-                  <span className="text-loss font-medium">{item.gain_loss_percent.toFixed(2)}%</span>
+                  <span className="text-loss font-medium">{(item.gain_loss_percent ?? 0).toFixed(2)}%</span>
                 </div>
               ))}
             </div>

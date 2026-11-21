@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
-import RiskPerformancePillar from '@/components/intelligence/RiskPerformancePillar'
+import RiskPerformancePillar from '@/features/analytics/components/RiskPerformancePillar'
 import { http } from '@/shared/api/http'
 import { BEARISH_HEALTH, NOW, analyticsRoutes } from '@/test/analyticsFixtures'
 import { createFakeServer, ok, polyfillRadixPointer, visibleText } from '@/test/fakeServer'

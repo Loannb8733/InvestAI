@@ -7,13 +7,7 @@ import {
 } from '@/components/ui/tooltip'
 import { HelpCircle } from 'lucide-react'
 import { type DisplayThresholds, DEFAULT_DISPLAY_THRESHOLDS } from '@/types'
-
-interface Correlation {
-  symbols: string[]
-  matrix: number[][]
-  strongly_correlated: [string, string, number][]
-  negatively_correlated: [string, string, number][]
-}
+import type { Correlation } from '../types'
 
 interface CorrelationMatrixProps {
   correlation: Correlation
@@ -21,7 +15,6 @@ interface CorrelationMatrixProps {
   thresholds?: DisplayThresholds['correlation']
 }
 
-// Diverging scale: bleu-gris (negative / diversifying) -> neutral (0) -> bordeaux (positive / concentration risk)
 const corrColor = (v: number, isDiag: boolean) => {
   if (isDiag) return 'bg-muted'
   const abs = Math.abs(v)
@@ -67,7 +60,7 @@ export default function CorrelationMatrix({ correlation, days, thresholds }: Cor
         <CardDescription>Comment vos actifs évoluent ensemble</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Heatmap grid */}
+
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full border-collapse">
             <thead>
@@ -88,7 +81,6 @@ export default function CorrelationMatrix({ correlation, days, thresholds }: Cor
                     const value = correlation.matrix[i]?.[j] ?? 0
                     const isDiag = i === j
                     const label = corrLabel(value, ct)
-                    // Full spoken meaning so the value is never conveyed by colour alone.
                     const cellAria = isDiag
                       ? `${sym1}, diagonale`
                       : `${sym1} / ${sym2} : ${value.toFixed(2)}${label ? `, ${label}` : ''}`
@@ -125,7 +117,6 @@ export default function CorrelationMatrix({ correlation, days, thresholds }: Cor
           </table>
         </div>
 
-        {/* Color scale legend — decorative; cell values carry the meaning */}
         <div className="flex items-center justify-center gap-2">
           <span className="text-xs text-muted-foreground">-1 (inverse)</span>
           <div className="relative flex h-3 w-48 rounded-full overflow-hidden" aria-hidden="true">
@@ -138,7 +129,6 @@ export default function CorrelationMatrix({ correlation, days, thresholds }: Cor
           <span className="text-xs text-muted-foreground">+1 (concentration)</span>
         </div>
 
-        {/* Notable pairs */}
         {(correlation.strongly_correlated.length > 0 || correlation.negatively_correlated.length > 0) && (
           <div className="grid gap-3 sm:grid-cols-2">
             {correlation.strongly_correlated.length > 0 && (

@@ -3292,6 +3292,21 @@ export interface components {
             /** Staked Quantity */
             staked_quantity?: number | null;
         };
+        /** AssetBetaResponse */
+        AssetBetaResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Asset Type */
+            asset_type: string;
+            /** Beta */
+            beta: number | null;
+            /** Benchmark */
+            benchmark: string;
+            /** Interpretation */
+            interpretation: string;
+            /** Value */
+            value: number;
+        };
         /** AssetCreate */
         AssetCreate: {
             /**
@@ -3579,6 +3594,22 @@ export interface components {
             /** Data */
             data: components["schemas"]["BenchmarkDataPoint"][];
         };
+        /** BetaResponse */
+        BetaResponse: {
+            /** Assets */
+            assets: components["schemas"]["AssetBetaResponse"][];
+            /** Portfolio Beta Crypto */
+            portfolio_beta_crypto: number | null;
+            /** Portfolio Beta Stock */
+            portfolio_beta_stock: number | null;
+            /**
+             * Benchmarks
+             * @default {}
+             */
+            benchmarks?: {
+                [key: string]: string;
+            };
+        };
         /** Body_analyze_api_v1_crowdfunding_analyze_post */
         Body_analyze_api_v1_crowdfunding_analyze_post: {
             /** Files */
@@ -3719,9 +3750,17 @@ export interface components {
             /** Matrix */
             matrix: number[][];
             /** Strongly Correlated */
-            strongly_correlated: unknown[][];
+            strongly_correlated: [
+                string,
+                string,
+                number
+            ][];
             /** Negatively Correlated */
-            negatively_correlated: unknown[][];
+            negatively_correlated: [
+                string,
+                string,
+                number
+            ][];
         };
         /** CreditDetails */
         CreditDetails: {
@@ -5701,6 +5740,16 @@ export interface components {
              */
             updated_at: string;
         };
+        /** PortfolioStressTestResponse */
+        PortfolioStressTestResponse: {
+            /** Total Value */
+            total_value: number;
+            /** Currency */
+            currency: string;
+            /** Scenarios */
+            scenarios: components["schemas"]["StressScenarioResponse"][];
+            max_drawdown: components["schemas"]["StressDrawdown"] | null;
+        };
         /** PortfolioUpdate */
         PortfolioUpdate: {
             /** Name */
@@ -6027,6 +6076,29 @@ export interface components {
             /** Current Value */
             current_value: number;
         };
+        /** RebalanceOrderResponse */
+        RebalanceOrderResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Name */
+            name: string;
+            /** Asset Type */
+            asset_type: string;
+            /** Current Weight */
+            current_weight: number;
+            /** Target Weight */
+            target_weight: number;
+            /** Diff Weight */
+            diff_weight: number;
+            /** Current Value */
+            current_value: number;
+            /** Target Value */
+            target_value: number;
+            /** Diff Value */
+            diff_value: number;
+            /** Action */
+            action: string;
+        };
         /**
          * RebalanceParams
          * @description Rééquilibrage vers l'allocation cible choisie, à partir des valeurs actuelles **saisies** par l'utilisateur
@@ -6067,9 +6139,7 @@ export interface components {
         /** RebalanceResponse */
         RebalanceResponse: {
             /** Orders */
-            orders: {
-                [key: string]: unknown;
-            }[];
+            orders: components["schemas"]["RebalanceOrderResponse"][];
         };
         /**
          * RebalancingOrderResponse
@@ -6720,6 +6790,53 @@ export interface components {
             params?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** StressAssetImpact */
+        StressAssetImpact: {
+            /** Symbol */
+            symbol: string;
+            /** Name */
+            name: string | null;
+            /** Current Value */
+            current_value: number;
+            /** Stressed Value */
+            stressed_value: number;
+            /** Loss */
+            loss: number;
+            /** Shock Pct */
+            shock_pct: number;
+            /** Risk Weight */
+            risk_weight: number;
+        };
+        /** StressDrawdown */
+        StressDrawdown: {
+            /** Value */
+            value: number;
+            /** Scenario */
+            scenario: string;
+            /** Estimated Recovery Months */
+            estimated_recovery_months: number;
+        };
+        /** StressScenarioResponse */
+        StressScenarioResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Duration Days */
+            duration_days: number;
+            /** Stressed Value */
+            stressed_value: number;
+            /** Total Loss */
+            total_loss: number;
+            /** Total Loss Pct */
+            total_loss_pct: number;
+            /** Estimated Recovery Months */
+            estimated_recovery_months: number;
+            /** Per Asset */
+            per_asset: components["schemas"]["StressAssetImpact"][];
         };
         /**
          * StressTest
@@ -9465,9 +9582,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioStressTestResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9499,9 +9614,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["BetaResponse"];
                 };
             };
             /** @description Validation Error */

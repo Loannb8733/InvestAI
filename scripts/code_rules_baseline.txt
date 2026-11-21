@@ -7,7 +7,6 @@ comments	backend/app/core/sentry_scrub.py
 comments	backend/app/core/symbol_map.py
 comments	backend/app/schemas/_money.py
 comments	backend/app/tasks/celery_app.py
-comments	frontend/src/components/analytics/CorrelationMatrix.tsx
 comments	frontend/src/components/charts/CurrencyExposureChart.tsx
 comments	frontend/src/components/charts/PerformanceChart.tsx
 comments	frontend/src/components/charts/PortfolioAreaChart.tsx
@@ -22,7 +21,6 @@ comments	frontend/src/components/dashboard/IASummaryWidget.tsx
 comments	frontend/src/components/intelligence/DecisionsPillar.tsx
 comments	frontend/src/components/intelligence/MarketSignalsPillar.tsx
 comments	frontend/src/components/intelligence/RegimeHeader.tsx
-comments	frontend/src/components/intelligence/RiskPerformancePillar.tsx
 comments	frontend/src/components/intelligence/decisions/PlannedOrdersSection.tsx
 comments	frontend/src/components/intelligence/decisions/StrategiesSection.tsx
 comments	frontend/src/components/intelligence/decisions/StrategyPerformancePanel.tsx
@@ -31,14 +29,6 @@ comments	frontend/src/components/intelligence/market/AnomaliesSection.tsx
 comments	frontend/src/components/intelligence/market/CycleContextSection.tsx
 comments	frontend/src/components/intelligence/market/PostureSuggestionCard.tsx
 comments	frontend/src/components/intelligence/market/ProjectionsSection.tsx
-comments	frontend/src/components/intelligence/risk/AllocationRiskCharts.tsx
-comments	frontend/src/components/intelligence/risk/AnalyticsExtras.tsx
-comments	frontend/src/components/intelligence/risk/HealthScoreSection.tsx
-comments	frontend/src/components/intelligence/risk/OptimizationSection.tsx
-comments	frontend/src/components/intelligence/risk/PerformanceCharts.tsx
-comments	frontend/src/components/intelligence/risk/RiskMetricRows.tsx
-comments	frontend/src/components/intelligence/risk/SmartRiskCards.tsx
-comments	frontend/src/components/intelligence/risk/types.ts
 comments	frontend/src/components/layout/FilDArianeProvider.tsx
 comments	frontend/src/components/layout/Layout.tsx
 comments	frontend/src/components/layout/NavRail.tsx
@@ -110,11 +100,9 @@ comments	frontend/src/types/simulations.ts
 too-long	backend/app/core/redis_client.py
 too-long	frontend/src/components/crowdfunding/PaymentTimeline.tsx
 too-long	frontend/src/components/dashboard/IASummaryWidget.tsx
-too-long	frontend/src/components/intelligence/RiskPerformancePillar.tsx
 too-long	frontend/src/components/intelligence/decisions/StrategiesSection.tsx
 too-long	frontend/src/components/intelligence/market/AlphaSignalsSection.tsx
 too-long	frontend/src/components/intelligence/market/ProjectionsSection.tsx
-too-long	frontend/src/components/intelligence/risk/OptimizationSection.tsx
 too-long	frontend/src/components/predictions/PredictionChartContainer.tsx
 too-long	frontend/src/components/predictions/PredictionCyclesTab.tsx
 too-long	frontend/src/components/reports/RebalancingTab.tsx
