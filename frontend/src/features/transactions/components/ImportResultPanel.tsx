@@ -1,5 +1,5 @@
 import { CheckCircle, SkipForward, XCircle } from 'lucide-react'
-import { counted } from '../format'
+import { counted } from '@/lib/utils'
 import type { CsvImportResult } from '../types'
 
 export default function ImportResultPanel({ result }: { result: CsvImportResult }) {

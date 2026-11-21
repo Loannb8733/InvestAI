@@ -1,11 +1,3 @@
-export function formatBalance(amount: number): string {
-  if (amount === 0) return '0'
-  if (amount < 0.00001) return amount.toExponential(2)
-  if (amount < 1) return amount.toFixed(6)
-  if (amount < 1000) return amount.toFixed(4)
-  return amount.toLocaleString('fr-FR', { maximumFractionDigits: 2 })
-}
-
 export interface Freshness {
   label: string
   className: string

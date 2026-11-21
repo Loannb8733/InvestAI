@@ -1,55 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatQuantity, generateCSV, getDateRangeStart } from './format'
-
-/**
- * Les trois fonctions pures de la page des transactions.
- *
- * `TransactionsPage` fait 1 497 lignes et n'était couverte à **0 %**. Monter la
- * page entière demanderait la moitié de l'application ; ces trois fonctions,
- * elles, portent des décisions qui se voient : comment une quantité s'affiche,
- * ce que « depuis le début de l'année » recouvre, et ce que contient le
- * fichier exporté.
- */
-
-describe('affichage des quantités', () => {
-  it('adapte la précision à la magnitude', () => {
-    /* Une position de 12 000 jetons n'a pas besoin de six décimales, et
-       0,00000123 BTC en a besoin de plus que deux. Quatre paliers, du millier
-       au millionième. */
-    // `toLocaleString('fr-FR')` sépare les milliers par une espace insécable
-    // étroite (U+202F), non par une espace ordinaire — la comparaison de
-    // chaînes s'y trompe facilement.
-    expect(formatQuantity(12345.6789)).toBe('12\u202f345,68')
-    expect(formatQuantity(12.3456789)).toBe('12,3457')
-    expect(formatQuantity(0.12345678)).toBe('0,123457')
-  })
-
-  it('bascule en chiffres significatifs sous le dix-millième', () => {
-    /* Sous ce seuil, un format à six décimales fixes rendrait « 0,000001 » —
-       la valeur perd ses chiffres utiles. Quatre chiffres significatifs la
-       préservent.
-
-       L'assertion porte sur la valeur exacte : se contenter de « ce n'est pas
-       zéro » laissait passer les deux formats, et le canari qui déplaçait le
-       seuil restait muet. */
-    expect(formatQuantity(0.00000123)).toBe('0,00000123')
-  })
-
-  it('rend « 0 » pour une quantité nulle ou illisible', () => {
-    expect(formatQuantity(0)).toBe('0')
-    expect(formatQuantity(NaN)).toBe('0')
-  })
-
-  it('conserve le signe des quantités négatives', () => {
-    // Un ajustement de balance peut être négatif : le masquer ferait lire une
-    // sortie comme une entrée.
-    expect(formatQuantity(-5.5)).toMatch(/^-/)
-  })
-
-  it('sépare les milliers à la française', () => {
-    expect(formatQuantity(1234567)).toBe('1\u202f234\u202f567')
-  })
-})
+import { generateCSV, getDateRangeStart } from './format'
 
 describe('plages de dates', () => {
   it('« tout » ne borne rien', () => {

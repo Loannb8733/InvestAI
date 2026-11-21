@@ -1,11 +1,6 @@
 {
   "toasts": [
     {
-      "title": "Erreur 400",
-      "description": "Clé API invalide pour Binance",
-      "variant": "destructive"
-    },
-    {
       "variant": "destructive",
       "title": "Erreur",
       "description": "Clé API invalide pour Binance"

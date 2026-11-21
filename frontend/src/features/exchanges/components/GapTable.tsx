@@ -1,4 +1,4 @@
-import { formatBalance } from '../format'
+import { formatCurrency, formatQuantity } from '@/lib/utils'
 import type { BalanceGap } from '../types'
 
 const SOURCE_LABELS: Record<BalanceGap['source_hint'], string> = {
@@ -25,8 +25,8 @@ export default function GapTable({ gaps }: { gaps: BalanceGap[] }) {
             <tr key={`${gap.asset_id}-${gap.exchange}`} className="border-b last:border-b-0">
               <td className="px-3 py-2 font-medium">{gap.symbol}</td>
               <td className="px-3 py-2 text-muted-foreground">{gap.exchange}</td>
-              <td className="px-3 py-2 text-right font-mono">+{formatBalance(gap.missing_qty)}</td>
-              <td className="px-3 py-2 text-right font-mono">{gap.missing_eur.toFixed(2)} €</td>
+              <td className="px-3 py-2 text-right font-mono">+{formatQuantity(gap.missing_qty)}</td>
+              <td className="px-3 py-2 text-right font-mono">{formatCurrency(gap.missing_eur)}</td>
               <td className="px-3 py-2 text-muted-foreground">{SOURCE_LABELS[gap.source_hint] ?? 'Inconnue'}</td>
             </tr>
           ))}

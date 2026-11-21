@@ -10,8 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { isColdWallet } from '@/lib/platforms'
-import { formatCurrency, formatDateTime } from '@/lib/utils'
-import { formatQuantity } from '../format'
+import { formatCurrency, formatDateTime, formatQuantity } from '@/lib/utils'
 import { CONVERSION_TYPES, INBOUND_TYPES, platformLabel, typeColor, typeLabel } from '../labels'
 import { totalOf } from '../ledger'
 import type { Transaction } from '../types'

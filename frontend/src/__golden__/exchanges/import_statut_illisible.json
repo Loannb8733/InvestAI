@@ -15,11 +15,6 @@
       "description": "L'import tourne en arrière-plan. Cela peut prendre quelques minutes."
     },
     {
-      "title": "Erreur serveur",
-      "description": "boom",
-      "variant": "destructive"
-    },
-    {
       "variant": "destructive",
       "title": "Erreur",
       "description": "Impossible de vérifier le statut de l'opération."

@@ -9,18 +9,7 @@
       "url": "/api-keys"
     }
   ],
-  "toasts": [
-    {
-      "title": "Erreur serveur",
-      "description": "boom",
-      "variant": "destructive"
-    },
-    {
-      "variant": "destructive",
-      "title": "Erreur de chargement",
-      "description": "Impossible de récupérer les données. Vérifiez votre connexion et réessayez."
-    }
-  ],
+  "toasts": [],
   "text": [
     "Impossible de charger vos clés API",
     "La requête a échoué : Request failed with status code 500",

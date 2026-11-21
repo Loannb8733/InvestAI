@@ -15,14 +15,9 @@
   ],
   "toasts": [
     {
-      "title": "Erreur de validation",
-      "description": "Adresse invalide",
-      "variant": "destructive"
-    },
-    {
       "variant": "destructive",
       "title": "Erreur",
-      "description": "Impossible d’enregistrer ce cold wallet."
+      "description": "Adresse invalide"
     }
   ],
   "card": [

@@ -1,11 +1,6 @@
 {
   "toasts": [
     {
-      "title": "Erreur serveur",
-      "description": "Binance injoignable",
-      "variant": "destructive"
-    },
-    {
       "variant": "destructive",
       "title": "Erreur",
       "description": "Binance injoignable"

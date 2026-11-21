@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/use-toast'
 import { invalidateAllFinancialData } from '@/lib/invalidate-queries'
 import { queryKeys } from '@/lib/queryKeys'
+import { counted } from '@/lib/utils'
 import { apiClient } from '@/shared/api/client'
 import { failureToast } from './hooks'
 
@@ -50,7 +51,7 @@ function useTaskPolling(onCompleted: () => void) {
 
     const interval = setInterval(async () => {
       try {
-        const status = await apiClient.get('/api-keys/import-status/{task_id}', { path: { task_id: taskId } })
+        const status = await apiClient.get('/api-keys/import-status/{task_id}', { path: { task_id: taskId }, silent: true })
         if (status.status === 'completed') {
           end()
           queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all })
@@ -79,13 +80,15 @@ export function useBackgroundTasks(onCompleted: () => void) {
   const [refreshingFxId, setRefreshingFxId] = useState<string | null>(null)
 
   const importMutation = useMutation({
-    mutationFn: (id: string) => apiClient.post('/api-keys/{api_key_id}/import-async', { path: { api_key_id: id } }),
+    mutationFn: (id: string) =>
+      apiClient.post('/api-keys/{api_key_id}/import-async', { path: { api_key_id: id }, silent: true }),
     onSuccess: (result) => {
       toast({ title: 'Import lancé', description: "L'import tourne en arrière-plan. Cela peut prendre quelques minutes." })
       follow(result.task_id, {
         successTitle: 'Import réussi',
         errorTitle: "Erreur d'import",
-        describe: (synced) => (synced > 0 ? `${synced} transaction(s) synchronisée(s)` : 'Aucune nouvelle transaction'),
+        describe: (synced) =>
+          synced > 0 ? counted(synced, 'transaction synchronisée', 'transactions synchronisées') : 'Aucune nouvelle transaction',
         onEnd: () => setImportingId(null),
       })
     },
@@ -96,13 +99,15 @@ export function useBackgroundTasks(onCompleted: () => void) {
   })
 
   const fxMutation = useMutation({
-    mutationFn: (id: string) => apiClient.post('/api-keys/{api_key_id}/refresh-fx', { path: { api_key_id: id } }),
+    mutationFn: (id: string) =>
+      apiClient.post('/api-keys/{api_key_id}/refresh-fx', { path: { api_key_id: id }, silent: true }),
     onSuccess: (result) => {
       toast({ title: 'Recalcul lancé', description: 'Les taux de change historiques sont recalculés en arrière-plan.' })
       follow(result.task_id, {
         successTitle: 'Recalcul terminé',
         errorTitle: 'Erreur de recalcul',
-        describe: (synced) => (synced > 0 ? `${synced} transaction(s) corrigée(s)` : 'Aucune correction nécessaire'),
+        describe: (synced) =>
+          synced > 0 ? counted(synced, 'transaction corrigée', 'transactions corrigées') : 'Aucune correction nécessaire',
         onEnd: () => setRefreshingFxId(null),
       })
     },

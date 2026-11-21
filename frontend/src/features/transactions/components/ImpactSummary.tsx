@@ -1,6 +1,5 @@
 import { Wallet } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { formatQuantity } from '../format'
+import { cn, formatQuantity } from '@/lib/utils'
 
 interface ImpactSummaryProps {
   type: string
