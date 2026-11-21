@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
-import RiskPerformancePillar from '@/components/intelligence/RiskPerformancePillar'
+import RiskPerformancePillar from '@/features/analytics/components/RiskPerformancePillar'
 import { http } from '@/shared/api/http'
 import { EMPTY_GLOBAL, NOW, analyticsRoutes, singleAsset, withGlobalWarning } from '@/test/analyticsFixtures'
 import { createFakeServer, ok, polyfillRadixPointer, visibleText } from '@/test/fakeServer'

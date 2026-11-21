@@ -1,15 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Zap } from 'lucide-react'
-
-interface MonteCarloData {
-  percentiles: Record<string, number>
-  expected_return: number
-  prob_positive: number
-  prob_loss_10: number
-  prob_ruin: number
-  simulations: number
-  horizon_days: number
-}
+import type { MonteCarloData } from '../types'
 
 interface MonteCarloCardProps {
   monteCarlo: MonteCarloData
@@ -29,7 +20,7 @@ export default function MonteCarloCard({ monteCarlo }: MonteCarloCardProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {/* Distribution bars */}
+
           <div className="space-y-2">
             {[
               { label: 'Pessimiste (5%)', value: monteCarlo.percentiles.p5, color: 'bg-loss' },
@@ -41,7 +32,7 @@ export default function MonteCarloCard({ monteCarlo }: MonteCarloCardProps) {
               <div key={p.label} className="flex items-center gap-3">
                 <span className="text-xs w-28 text-muted-foreground">{p.label}</span>
                 <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden relative">
-                  {/* Fixed ±200% scale: center at 50%, each 1% = 0.25px */}
+
                   <div
                     className={`h-full ${p.color} rounded-full absolute`}
                     style={(() => {
@@ -70,7 +61,7 @@ export default function MonteCarloCard({ monteCarlo }: MonteCarloCardProps) {
               </div>
             ))}
           </div>
-          {/* Stats */}
+
           <div className="grid grid-cols-4 gap-3 pt-2 border-t">
             <div className="text-center">
               <div className="text-lg font-bold">{monteCarlo.expected_return > 0 ? '+' : ''}{monteCarlo.expected_return.toFixed(1)}%</div>

@@ -18,19 +18,9 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react'
-import type { PortfolioHealth } from './types'
+import type { PortfolioHealth } from '../types'
 
-/**
- * Tête du pilier « Risque & Performance » : le score de santé décomposé.
- *
- * Copié depuis SmartInsightsPage (score global + Recommandations IA avec
- * potential_improvement). Les cartes métriques dupliquées de SmartInsights
- * (Sharpe, VaR, HHI, Max Drawdown) ne sont PAS reprises ici : la seule
- * source de vérité des métriques de risque est RiskMetricRows (queries
- * Analytics, pilotées par le sélecteur unique du pilier).
- */
-
-function formatMetric(name: string | undefined, value: number): string {
+function formatMetric(name: string | null | undefined, value: number): string {
   const v = Number.isFinite(value) ? value : 0
   if (!name) return v.toFixed(2)
   const n = name.toLowerCase()
@@ -131,7 +121,7 @@ export default function HealthScoreSection({
 
   return (
     <SpotlightGroup className="grid gap-4 lg:grid-cols-3">
-      {/* Score global */}
+
       <Card elevation="raised" className={`spot-card border-2 ${getScoreBg(health.overall_score)}`}>
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
@@ -148,7 +138,6 @@ export default function HealthScoreSection({
         </CardContent>
       </Card>
 
-      {/* Décomposition : Recommandations IA (insights avec potential_improvement) */}
       {health.insights.length > 0 ? (
         <Card elevation="raised" className="spot-card lg:col-span-2">
           <CardHeader>
@@ -190,7 +179,7 @@ export default function HealthScoreSection({
                         </p>
                       )}
 
-                      {insight.actions.length > 0 && (
+                      {insight.actions && insight.actions.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {insight.actions.map((action, aidx) => (
                             <Badge key={aidx} variant="secondary" className="text-xs" title={

@@ -10,16 +10,10 @@ import { ResponsivePie } from '@nivo/pie'
 import { ResponsiveRadar } from '@nivo/radar'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
 import { HelpCircle } from 'lucide-react'
-import type { AnalyticsData } from './types'
-
-/**
- * Répartition par classe d'actifs + radar « Profil de risque »
- * (copiés d'AnalyticsPage, pilotés par le sélecteur unique du pilier).
- */
+import type { AnalyticsData } from '../types'
 
 const COLORS = ['oklch(var(--chart-5))', 'oklch(var(--chart-3))', 'oklch(var(--chart-1))', 'oklch(var(--chart-4))', 'oklch(var(--chart-2))', 'oklch(var(--chart-2))', 'oklch(var(--chart-5))', 'oklch(var(--chart-3))']
 
-// Ordre des tokens aligné sur COLORS, pour résoudre des couleurs rgb() compatibles Nivo
 const COLOR_TOKENS = ['--chart-5', '--chart-3', '--chart-1', '--chart-4', '--chart-2', '--chart-2', '--chart-5', '--chart-3']
 
 interface AllocationRiskChartsProps {
@@ -79,7 +73,7 @@ export default function AllocationRiskCharts({ analytics, diversificationScore }
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      {/* Répartition par classe d'actifs */}
+
       <Card elevation="raised">
         <CardHeader>
           <CardTitle>Répartition par classe d'actifs</CardTitle>
@@ -127,7 +121,6 @@ export default function AllocationRiskCharts({ analytics, diversificationScore }
         </CardContent>
       </Card>
 
-      {/* Radar de risque */}
       <Card elevation="raised">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

@@ -18,22 +18,8 @@ import {
   TrendingDown,
   Zap,
 } from 'lucide-react'
-import type { AnalyticsData, Diversification } from './types'
+import type { AnalyticsData, Diversification } from '../types'
 
-/**
- * Métriques de risque UNIFIÉES du pilier « Risque & Performance ».
- *
- * Source unique : les queries d'Analytics (endpoint /analytics), pilotées par
- * le sélecteur période/portefeuille du pilier. Les cartes équivalentes de
- * SmartInsights (Sharpe, VaR, Max Drawdown, HHI) sont supprimées : fini le
- * Sharpe différent entre deux onglets.
- *
- * Concentration : affichée UNE fois, au format Analytics — le score de
- * diversification /100 (composite nb actifs + nb classes + HHI), plus
- * lisible que le HHI brut ×10000 de SmartInsights.
- */
-
-// Tooltips d'explication des métriques (copiés d'AnalyticsPage)
 const metricExplanations: Record<string, { title: string; description: string }> = {
   volatility: {
     title: 'Volatilité',
@@ -94,7 +80,6 @@ const MetricWithTooltip = ({ metricKey, children }: { metricKey: string; childre
   )
 }
 
-// Formatage sûr avec fallback pour null/undefined
 const safeFixed = (v: number | null | undefined, d: number): string =>
   v == null || isNaN(v) ? '—' : v.toFixed(d)
 
@@ -107,7 +92,7 @@ interface RiskMetricRowsProps {
 export default function RiskMetricRows({ analytics, diversification, xirr }: RiskMetricRowsProps) {
   return (
     <>
-      {/* Rangée 1 : risque cœur */}
+
       <SpotlightGroup className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card elevation="raised" className="spot-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -189,7 +174,6 @@ export default function RiskMetricRows({ analytics, diversification, xirr }: Ris
         </Card>
       </SpotlightGroup>
 
-      {/* Rangée 2 : risque extrême + XIRR */}
       <SpotlightGroup className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card elevation="raised" className="spot-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

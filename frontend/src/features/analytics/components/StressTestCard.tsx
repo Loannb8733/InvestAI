@@ -2,38 +2,13 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 import { AlertTriangle, ChevronDown, ChevronUp, Clock, TrendingDown, TrendingUp, Shield } from 'lucide-react'
-
-interface StressScenario {
-  id: string
-  name: string
-  description: string
-  duration_days: number
-  stressed_value: number
-  total_loss: number
-  total_loss_pct: number
-  estimated_recovery_months: number
-  per_asset: Array<{
-    symbol: string
-    name: string
-    current_value: number
-    stressed_value: number
-    loss: number
-    shock_pct: number
-    risk_weight: number
-  }>
-}
-
-interface MaxDrawdown {
-  value: number
-  scenario: string
-  estimated_recovery_months: number
-}
+import type { StressScenario, StressTestData } from '../types'
 
 interface StressTestCardProps {
   scenarios: StressScenario[]
   totalValue: number
   currency: string
-  maxDrawdown: MaxDrawdown | null
+  maxDrawdown: StressTestData['max_drawdown']
 }
 
 export default function StressTestCard({ scenarios, totalValue, currency, maxDrawdown }: StressTestCardProps) {
@@ -56,7 +31,7 @@ export default function StressTestCard({ scenarios, totalValue, currency, maxDra
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* MaxDD Banner */}
+
         {maxDrawdown && (
           <div className="flex items-center gap-3 rounded-lg bg-loss dark:bg-loss/20 border border-loss dark:border-loss p-3">
             <Shield className="h-5 w-5 text-loss shrink-0" />
@@ -78,7 +53,6 @@ export default function StressTestCard({ scenarios, totalValue, currency, maxDra
           </div>
         )}
 
-        {/* Scenario selector grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {scenarios.map((scenario) => {
             const isSelected = selectedScenario === scenario.id
@@ -112,7 +86,6 @@ export default function StressTestCard({ scenarios, totalValue, currency, maxDra
           })}
         </div>
 
-        {/* Compact list (when no scenario selected) */}
         {!active && (
           <div className="space-y-2">
             {scenarios.map((scenario) => {
@@ -151,7 +124,6 @@ export default function StressTestCard({ scenarios, totalValue, currency, maxDra
           </div>
         )}
 
-        {/* Detailed comparison view (when scenario selected) */}
         {active && (
           <div className="rounded-lg border p-4 space-y-4">
             <div className="flex items-start justify-between">
@@ -170,7 +142,6 @@ export default function StressTestCard({ scenarios, totalValue, currency, maxDra
               </div>
             </div>
 
-            {/* Before / After comparison */}
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="rounded-lg bg-muted/50 p-2">
                 <div className="text-xs text-muted-foreground">Actuel</div>
@@ -189,7 +160,6 @@ export default function StressTestCard({ scenarios, totalValue, currency, maxDra
               </div>
             </div>
 
-            {/* Per-asset breakdown toggle */}
             <button
               onClick={() => setShowAssets(!showAssets)}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"

@@ -1,5 +1,3 @@
-from typing import Any
-
 from pydantic import BaseModel
 
 
@@ -46,8 +44,8 @@ class PortfolioAnalyticsResponse(BaseModel):
 class CorrelationResponse(BaseModel):
     symbols: list[str]
     matrix: list[list[float]]
-    strongly_correlated: list[tuple[Any, ...]]
-    negatively_correlated: list[tuple[Any, ...]]
+    strongly_correlated: list[tuple[str, str, float]]
+    negatively_correlated: list[tuple[str, str, float]]
 
 
 class RecommendationResponse(BaseModel):
@@ -129,7 +127,58 @@ class PerformanceSummaryResponse(BaseModel):
 
 
 class RebalanceResponse(BaseModel):
-    orders: list[dict[str, Any]]
+    orders: list[RebalanceOrderResponse]
+
+
+class StressAssetImpact(BaseModel):
+    symbol: str
+    name: str | None
+    current_value: float
+    stressed_value: float
+    loss: float
+    shock_pct: float | int
+    risk_weight: float
+
+
+class StressScenarioResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    duration_days: int
+    stressed_value: float
+    total_loss: float
+    total_loss_pct: float
+    estimated_recovery_months: int
+    per_asset: list[StressAssetImpact]
+
+
+class StressDrawdown(BaseModel):
+    value: float
+    scenario: str
+    estimated_recovery_months: int
+
+
+class PortfolioStressTestResponse(BaseModel):
+    total_value: float | int
+    currency: str
+    scenarios: list[StressScenarioResponse]
+    max_drawdown: StressDrawdown | None
+
+
+class AssetBetaResponse(BaseModel):
+    symbol: str
+    asset_type: str
+    beta: float | None
+    benchmark: str
+    interpretation: str
+    value: float
+
+
+class BetaResponse(BaseModel):
+    assets: list[AssetBetaResponse]
+    portfolio_beta_crypto: float | None
+    portfolio_beta_stock: float | None
+    benchmarks: dict[str, str] = {}
 
 
 class XIRRResponse(BaseModel):

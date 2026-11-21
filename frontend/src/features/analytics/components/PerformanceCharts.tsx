@@ -2,12 +2,7 @@ import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ResponsiveBar } from '@nivo/bar'
 import { useNivoTheme } from '@/components/charts/nivo-theme'
-import type { AnalyticsData } from './types'
-
-/**
- * Barres « Performance par actif » (top 10) + « Top 10 positions »
- * (copiées d'AnalyticsPage, pilotées par le sélecteur unique du pilier).
- */
+import type { AnalyticsData } from '../types'
 
 interface PerformanceChartsProps {
   analytics: AnalyticsData
@@ -43,7 +38,7 @@ export default function PerformanceCharts({ analytics }: PerformanceChartsProps)
 
   return (
     <>
-      {/* Performance par actif */}
+
       <Card elevation="raised">
         <CardHeader>
           <CardTitle>Performance par actif</CardTitle>
@@ -83,7 +78,6 @@ export default function PerformanceCharts({ analytics }: PerformanceChartsProps)
         </CardContent>
       </Card>
 
-      {/* Top 10 positions */}
       <Card elevation="raised">
         <CardHeader>
           <CardTitle>Top 10 positions</CardTitle>

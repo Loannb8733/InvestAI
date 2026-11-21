@@ -7,11 +7,6 @@ export const dashboardApi = {
     return response.data
   },
 
-  getHistoricalData: async (days: number = 30) => {
-    const response = await api.get('/dashboard/historical-data', { params: { days } })
-    return response.data
-  },
-
   getBenchmarks: async (days: number = 90) => {
     const response = await api.get('/dashboard/benchmarks', { params: { days } })
     return response.data
@@ -55,40 +50,6 @@ export const analyticsApi = {
     return response.data
   },
 
-  getGlobal: async (days?: number) => {
-    const response = await api.get('/analytics', { params: days ? { days } : {}, timeout: ANALYTICS_TIMEOUT })
-    return response.data
-  },
-
-  getPortfolio: async (portfolioId: string, days?: number) => {
-    const response = await api.get(`/analytics/portfolio/${portfolioId}`, { params: days ? { days } : {}, timeout: ANALYTICS_TIMEOUT })
-    return response.data
-  },
-
-  getCorrelation: async (portfolioId?: string, days?: number) => {
-    const response = await api.get('/analytics/correlation', {
-      params: { ...(portfolioId ? { portfolio_id: portfolioId } : {}), ...(days ? { days } : {}) },
-      timeout: ANALYTICS_TIMEOUT,
-    })
-    return response.data
-  },
-
-  getDiversification: async (portfolioId?: string, days?: number) => {
-    const response = await api.get('/analytics/diversification', {
-      params: { ...(portfolioId ? { portfolio_id: portfolioId } : {}), ...(days ? { days } : {}) },
-      timeout: ANALYTICS_TIMEOUT,
-    })
-    return response.data
-  },
-
-  getPerformance: async (period: string = '30d', portfolioId?: string) => {
-    const response = await api.get('/analytics/performance', {
-      params: { period, ...(portfolioId ? { portfolio_id: portfolioId } : {}) },
-      timeout: ANALYTICS_TIMEOUT,
-    })
-    return response.data
-  },
-
   getMonteCarlo: async (
     horizon: number = 90,
     portfolioId?: string,
@@ -106,43 +67,6 @@ export const analyticsApi = {
       },
       timeout: ANALYTICS_TIMEOUT,
     })
-    return response.data
-  },
-
-  getXirr: async (portfolioId?: string) => {
-    const response = await api.get('/analytics/xirr', {
-      params: portfolioId ? { portfolio_id: portfolioId } : {},
-      timeout: ANALYTICS_TIMEOUT,
-    })
-    return response.data
-  },
-
-  getOptimize: async (objective: string = 'max_sharpe', days?: number) => {
-    const response = await api.get('/analytics/optimize', {
-      params: { objective, ...(days ? { days } : {}) },
-      timeout: ANALYTICS_TIMEOUT,
-    })
-    return response.data
-  },
-
-  getStressTest: async (portfolioId?: string) => {
-    const response = await api.get('/analytics/stress-test', {
-      params: { ...(portfolioId ? { portfolio_id: portfolioId } : {}) },
-      timeout: ANALYTICS_TIMEOUT,
-    })
-    return response.data
-  },
-
-  getBeta: async (days: number = 90, portfolioId?: string) => {
-    const response = await api.get('/analytics/beta', {
-      params: { days, ...(portfolioId ? { portfolio_id: portfolioId } : {}) },
-      timeout: ANALYTICS_TIMEOUT,
-    })
-    return response.data
-  },
-
-  postRebalance: async (targetWeights: Record<string, number>) => {
-    const response = await api.post('/analytics/rebalance', targetWeights, { timeout: ANALYTICS_TIMEOUT })
     return response.data
   },
 }
@@ -246,16 +170,6 @@ export const predictionsApi = {
     return response.data
   },
 
-  createPlannedOrder: async (data: {
-    symbol: string
-    side: 'buy' | 'sell'
-    amount_eur: number
-    notes?: string
-    source?: 'frontend' | 'telegram'
-  }) => {
-    const response = await api.post('/predictions/planned-orders', data)
-    return response.data
-  },
 }
 
 // Alerts API
@@ -643,10 +557,6 @@ export const notificationsApi = {
 /** Profil investisseur (paramètres financiers). `null` = non renseigné. */
 // Smart Insights API
 export const smartInsightsApi = {
-  getHealth: async (days: number = 30) => {
-    const response = await api.get('/smart-insights/health', { params: { days }, timeout: ANALYTICS_TIMEOUT })
-    return response.data
-  },
 
   getAnomaliesImpact: async () => {
     const response = await api.get('/smart-insights/anomalies-impact', { timeout: ANALYTICS_TIMEOUT })

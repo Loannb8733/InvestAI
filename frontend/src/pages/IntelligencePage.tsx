@@ -28,7 +28,7 @@ import { LEGACY_TAB_MAP, TABS } from './intelligenceTabs'
  * Rapports › Optimisations.
  */
 
-const RiskPerformancePillar = lazyWithRetry(() => import('@/components/intelligence/RiskPerformancePillar'))
+const RiskPerformancePillar = lazyWithRetry(() => import('@/features/analytics/components/RiskPerformancePillar'))
 const MarketSignalsPillar = lazyWithRetry(() => import('@/components/intelligence/MarketSignalsPillar'))
 const DecisionsPillar = lazyWithRetry(() => import('@/components/intelligence/DecisionsPillar'))
 const AlertsPage = lazyWithRetry(() => import('@/pages/AlertsPage'))

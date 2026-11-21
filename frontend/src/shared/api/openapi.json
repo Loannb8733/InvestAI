@@ -3637,9 +3637,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Stress Test Api V1 Analytics Stress Test Get"
+                  "$ref": "#/components/schemas/PortfolioStressTestResponse"
                 }
               }
             }
@@ -3706,9 +3704,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Beta Api V1 Analytics Beta Get"
+                  "$ref": "#/components/schemas/BetaResponse"
                 }
               }
             }
@@ -10043,6 +10039,51 @@
         "title": "AssetAllocation",
         "description": "Part d'un actif dans le patrimoine."
       },
+      "AssetBetaResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "asset_type": {
+            "type": "string",
+            "title": "Asset Type"
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
+          },
+          "benchmark": {
+            "type": "string",
+            "title": "Benchmark"
+          },
+          "interpretation": {
+            "type": "string",
+            "title": "Interpretation"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "asset_type",
+          "beta",
+          "benchmark",
+          "interpretation",
+          "value"
+        ],
+        "title": "AssetBetaResponse"
+      },
       "AssetCreate": {
         "properties": {
           "portfolio_id": {
@@ -10896,6 +10937,54 @@
         "title": "BenchmarkSeries",
         "description": "Une série de comparaison en base 100."
       },
+      "BetaResponse": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetBetaResponse"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
+          "portfolio_beta_crypto": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Beta Crypto"
+          },
+          "portfolio_beta_stock": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Beta Stock"
+          },
+          "benchmarks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Benchmarks",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "assets",
+          "portfolio_beta_crypto",
+          "portfolio_beta_stock"
+        ],
+        "title": "BetaResponse"
+      },
       "Body_analyze_api_v1_crowdfunding_analyze_post": {
         "properties": {
           "files": {
@@ -11229,16 +11318,40 @@
           },
           "strongly_correlated": {
             "items": {
-              "items": {},
-              "type": "array"
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array",
+              "maxItems": 3,
+              "minItems": 3
             },
             "type": "array",
             "title": "Strongly Correlated"
           },
           "negatively_correlated": {
             "items": {
-              "items": {},
-              "type": "array"
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array",
+              "maxItems": 3,
+              "minItems": 3
             },
             "type": "array",
             "title": "Negatively Correlated"
@@ -16596,6 +16709,50 @@
         ],
         "title": "PortfolioResponse"
       },
+      "PortfolioStressTestResponse": {
+        "properties": {
+          "total_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Total Value"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/StressScenarioResponse"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          },
+          "max_drawdown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StressDrawdown"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_value",
+          "currency",
+          "scenarios",
+          "max_drawdown"
+        ],
+        "title": "PortfolioStressTestResponse"
+      },
       "PortfolioUpdate": {
         "properties": {
           "name": {
@@ -17569,6 +17726,64 @@
         ],
         "title": "RebalanceLine"
       },
+      "RebalanceOrderResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "asset_type": {
+            "type": "string",
+            "title": "Asset Type"
+          },
+          "current_weight": {
+            "type": "number",
+            "title": "Current Weight"
+          },
+          "target_weight": {
+            "type": "number",
+            "title": "Target Weight"
+          },
+          "diff_weight": {
+            "type": "number",
+            "title": "Diff Weight"
+          },
+          "current_value": {
+            "type": "number",
+            "title": "Current Value"
+          },
+          "target_value": {
+            "type": "number",
+            "title": "Target Value"
+          },
+          "diff_value": {
+            "type": "number",
+            "title": "Diff Value"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "name",
+          "asset_type",
+          "current_weight",
+          "target_weight",
+          "diff_weight",
+          "current_value",
+          "target_value",
+          "diff_value",
+          "action"
+        ],
+        "title": "RebalanceOrderResponse"
+      },
       "RebalanceParams": {
         "properties": {
           "template": {
@@ -17637,8 +17852,7 @@
         "properties": {
           "orders": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/RebalanceOrderResponse"
             },
             "type": "array",
             "title": "Orders"
@@ -19461,6 +19675,142 @@
         },
         "type": "object",
         "title": "StrategyUpdate"
+      },
+      "StressAssetImpact": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "current_value": {
+            "type": "number",
+            "title": "Current Value"
+          },
+          "stressed_value": {
+            "type": "number",
+            "title": "Stressed Value"
+          },
+          "loss": {
+            "type": "number",
+            "title": "Loss"
+          },
+          "shock_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Shock Pct"
+          },
+          "risk_weight": {
+            "type": "number",
+            "title": "Risk Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "name",
+          "current_value",
+          "stressed_value",
+          "loss",
+          "shock_pct",
+          "risk_weight"
+        ],
+        "title": "StressAssetImpact"
+      },
+      "StressDrawdown": {
+        "properties": {
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "scenario": {
+            "type": "string",
+            "title": "Scenario"
+          },
+          "estimated_recovery_months": {
+            "type": "integer",
+            "title": "Estimated Recovery Months"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "scenario",
+          "estimated_recovery_months"
+        ],
+        "title": "StressDrawdown"
+      },
+      "StressScenarioResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "duration_days": {
+            "type": "integer",
+            "title": "Duration Days"
+          },
+          "stressed_value": {
+            "type": "number",
+            "title": "Stressed Value"
+          },
+          "total_loss": {
+            "type": "number",
+            "title": "Total Loss"
+          },
+          "total_loss_pct": {
+            "type": "number",
+            "title": "Total Loss Pct"
+          },
+          "estimated_recovery_months": {
+            "type": "integer",
+            "title": "Estimated Recovery Months"
+          },
+          "per_asset": {
+            "items": {
+              "$ref": "#/components/schemas/StressAssetImpact"
+            },
+            "type": "array",
+            "title": "Per Asset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "duration_days",
+          "stressed_value",
+          "total_loss",
+          "total_loss_pct",
+          "estimated_recovery_months",
+          "per_asset"
+        ],
+        "title": "StressScenarioResponse"
       },
       "StressTest": {
         "properties": {
